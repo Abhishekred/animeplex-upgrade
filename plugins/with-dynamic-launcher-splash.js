@@ -177,18 +177,24 @@ const withLauncherMainActivity = config =>
     return activityConfig;
   });
 
-const writeLauncherResources = resRoot => {
+const writeLauncherResources = (resRoot, projectRoot) => {
   const drawable = path.join(resRoot, 'drawable');
   const drawableV26 = path.join(resRoot, 'drawable-v26');
   fs.mkdirSync(drawable, {recursive: true});
   fs.mkdirSync(drawableV26, {recursive: true});
+  const aplogoSource = path.join(projectRoot, 'assets', 'aplogo.png');
+  const drawableNodpi = path.join(resRoot, 'drawable-nodpi');
+  fs.mkdirSync(drawableNodpi, {recursive: true});
+  if (fs.existsSync(aplogoSource)) {
+    fs.copyFileSync(aplogoSource, path.join(drawableNodpi, 'aplogo.png'));
+  }
   for (const variant of variants) {
     const id = variant.id.toLowerCase();
     fs.writeFileSync(
       path.join(drawable, `ic_launcher_foreground_${id}.xml`),
       `<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
     android:gravity="center"
-    android:src="@mipmap/ic_launcher_foreground"
+    android:src="@drawable/aplogo"
     android:tint="${variant.color}"
     android:tintMode="src_in" />\n`,
     );
@@ -263,7 +269,7 @@ const withLauncherResources = config =>
         'main',
         'res',
       );
-      writeLauncherResources(resRoot);
+      writeLauncherResources(resRoot, projectRoot);
       copyTvBannerResources(projectRoot, resRoot);
       copySplashResources(projectRoot, resRoot);
       patchGeneratedBootSplashFiles(
