@@ -341,60 +341,7 @@ const Settings = ({navigation}: Props) => {
               </Animated.View>
             )}
 
-            {/* Content provider section */}
-            <AnimatedSection delay={100}>
-              <View className="mb-6">
-                <AppText
-                  role="labelLarge"
-                  className="mb-3"
-                  style={{color: colors.onSurfaceVariant}}>
-                  Content Provider
-                </AppText>
-                <View
-                  style={{
-                    backgroundColor: colors.background,
-                    borderColor: colors.outlineVariant,
-                    borderRadius: 24,
-                    borderWidth: 1,
-                    height: 116,
-                    justifyContent: 'center',
-                  }}>
-                  <ScrollView
-                    horizontal
-                    nestedScrollEnabled
-                    focusable={false}
-                    accessible={false}
-                    showsHorizontalScrollIndicator={false}
-                    style={{flexGrow: 0}}
-                    contentContainerStyle={{
-                      alignItems: 'center',
-                      paddingHorizontal: 10,
-                    }}>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      {providersList}
-                    </View>
-                    {installedProviders.length === 0 && (
-                      <AppText
-                        role="bodyMedium"
-                        style={{color: colors.onSurfaceVariant}}>
-                        No providers installed
-                      </AppText>
-                    )}
-                  </ScrollView>
-                </View>
-              </View>
-              <SettingsSection title="Provider tools">
-                <SettingsRow
-                  ref={providerManagerRowRef}
-                  hasTVPreferredFocus={isTV && installedProviders.length === 0}
-                  title="Provider Manager"
-                  description="Install, update, and test provider extensions"
-                  icon="puzzle-outline"
-                  divider={false}
-                  onPress={() => navigation.navigate('Extensions')}
-                />
-              </SettingsSection>
-            </AnimatedSection>
+            {/* Content Provider and Provider tools hidden for AnimePlex branding. */}
 
             {/* Network Section */}
             <AnimatedSection delay={150}>
