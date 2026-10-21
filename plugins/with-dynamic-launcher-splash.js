@@ -185,9 +185,10 @@ const writeLauncherResources = (resRoot, projectRoot) => {
   const aplogoSource = path.join(projectRoot, 'assets', 'aplogo.png');
   const drawableNodpi = path.join(resRoot, 'drawable-nodpi');
   fs.mkdirSync(drawableNodpi, {recursive: true});
-  if (fs.existsSync(aplogoSource)) {
-    fs.copyFileSync(aplogoSource, path.join(drawableNodpi, 'aplogo.png'));
-  }
+  const iconSource = fs.existsSync(aplogoSource)
+    ? aplogoSource
+    : path.join(projectRoot, 'assets', 'adaptive_icon.png');
+  fs.copyFileSync(iconSource, path.join(drawableNodpi, 'aplogo.png'));
   for (const variant of variants) {
     const id = variant.id.toLowerCase();
     fs.writeFileSync(
