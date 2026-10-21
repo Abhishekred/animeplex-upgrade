@@ -35,7 +35,7 @@ module.exports = () => {
     './plugins/with-notifee-service.js',
     './plugins/with-android-release-gradle.js',
     './plugins/with-native-scroll-performance.js',
-    './plugins/with-android-signing.js',
+    ...(process.env.APP_VARIANT === 'standalone' ? [] : ['./plugins/with-android-signing.js']),
     './plugins/with-android-okhttp.js',
     ...(HAS_FIREBASE ? ['@react-native-firebase/app'] : []),
     ...(HAS_FIREBASE ? ['@react-native-firebase/crashlytics'] : []),
