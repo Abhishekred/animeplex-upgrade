@@ -1,10 +1,20 @@
 name: Nightly Build
 
 on:
-  schedule:
-    # Runs at 12:00 AM India time (18:30 UTC of previous day)
-    - cron: '30 18 * * *'
-  # Optional: Allow manual trigger
+  # Build only when relevant app/native code changes are pushed.
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'android/**'
+      - 'app.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'plugins/**'
+      - 'scripts/**'
+      - '.github/workflows/main.yml'
+  # Manual trigger remains available when you want a build on demand.
   workflow_dispatch:
     inputs:
       branch:
