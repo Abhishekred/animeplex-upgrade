@@ -45,7 +45,7 @@ export const themes: {name: string; color: string}[] = [
 ];
 
 export const socialLinks = {
-  github: 'https://github.com/vega-org/vega-app',
+  github: 'https://www.instagram.com/animeplexofficial?srtk=MTR3OWY4NjVqNGhheg==',
   discord: 'https://discord.gg/cr42m6maWy',
   sponsor: 'https://github.com/sponsors/Zenda-Cross',
 };
