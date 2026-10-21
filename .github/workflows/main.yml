@@ -65,7 +65,10 @@ jobs:
       - name: Build release APK
         run: |
           cd android
-          ./gradlew --no-daemon assembleRelease --stacktrace
+          # Give Gradle a larger heap and limit workers to reduce peak memory use on CI.
+          ./gradlew --no-daemon --max-workers=2 \
+            -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" \
+            assembleRelease --stacktrace
 
       - name: Check APK output
         shell: bash
