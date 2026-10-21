@@ -137,9 +137,9 @@ module.exports = () => {
   ];
   return {
     expo: {
-      name: 'Vega',
+      name: 'AnimePlex',
       scheme: APP_SCHEME,
-      displayName: 'Vega',
+      displayName: 'AnimePlex',
       jsEngine: 'hermes',
       newArchEnabled: true,
       autolinking: {exclude: ['expo-splash-screen']},
