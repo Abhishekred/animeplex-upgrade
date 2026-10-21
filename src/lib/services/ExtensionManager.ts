@@ -6,6 +6,7 @@ import {
   ProviderSource,
 } from '../storage/extensionStorage';
 import {mainStorage} from '../storage/StorageService';
+import useContentStore from '../zustand/contentStore';
 import {
   getSourceAuthHeaders,
   sourceTokenStorage,
@@ -519,7 +520,7 @@ export class ExtensionManager {
       this.migrateLegacyCustomProviderSource();
 
       // AnimePlex: configure the bundled provider source on first launch.
-      const defaultSourceUrl = 'https://github.com/sachinqzqz-web/vega-providers';
+      const defaultSourceUrl = 'https://raw.githubusercontent.com/sachinqzqz-web/vega-providers/refs/heads/main';
       if (!extensionStorage.getProviderSources().some(s => s.author === 'sachinqzqz-web')) {
         extensionStorage.addProviderSources('sachinqzqz-web', defaultSourceUrl);
       }
@@ -570,9 +571,8 @@ export class ExtensionManager {
       const installedNow = extensionStorage.getInstalledProviders();
       const movieBox = installedNow.find(p => p.value === 'movieBoxWeb');
       if (movieBox) {
-        const store = require('../zustand/contentStore').default;
-        store.getState().setInstalledProviders(installedNow);
-        store.getState().setProvider(movieBox);
+        useContentStore.getState().setInstalledProviders(installedNow);
+        useContentStore.getState().setProvider(movieBox);
       }
     } catch (error) {
       console.error('Failed to initialize extension system:', error);
