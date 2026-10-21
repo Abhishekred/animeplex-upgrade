@@ -53,7 +53,7 @@ jobs:
       - name: Generate standalone Android project
         env:
           APP_VARIANT: standalone
-        run: npm run prebuild:clean
+        run: npm run build:sandbox && npx expo prebuild --platform android --clean
 
       - name: Make Gradle wrapper executable
         run: chmod +x android/gradlew
@@ -65,7 +65,7 @@ jobs:
       - name: Prepare APK artifact
         run: |
           mkdir -p apks
-          find android/app/build/outputs/apk/release -type f -name '*.apk' -exec cp {} apks/ \;
+          find android/app/build/outputs/apk/release -type f -name '*.apk' -exec cp {} apks/ \\\;
           if [ -z "$(find apks -maxdepth 1 -type f -name '*.apk' -print -quit)" ]; then
             echo "No APK was generated."
             exit 1
