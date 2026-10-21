@@ -1,0 +1,121 @@
+name: AnimePlex Unsigned APK Build
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  schedule:
+    - cron: '30 18 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    name: Build Unsigned Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Configure unsigned release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          GRADLE_FILE="android/app/build.gradle"
+
+          if [ ! -f "$GRADLE_FILE" ]; then
+            echo "ERROR: $GRADLE_FILE was not generated."
+            exit 1
+          fi
+
+          echo "Checking release signing configuration..."
+
+          # Remove the standard Expo/Groovy release signing assignment.
+          # Do not add debug or release keystore credentials.
+          sed -i '/signingConfig signingConfigs\.release/d' "$GRADLE_FILE"
+
+          echo "Remaining signing configuration lines:"
+          grep -n "signingConfig" "$GRADLE_FILE" || true
+
+          chmod +x android/gradlew
+
+      - name: Build release APK
+        run: |
+          cd android
+          ./gradlew --no-daemon assembleRelease --stacktrace
+
+      - name: Check APK output
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p apks
+
+          find android/app/build/outputs/apk/release \
+            -type f -name "*.apk" -print
+
+          find android/app/build/outputs/apk/release \
+            -type f -name "*.apk" -exec cp {} apks/ \;
+
+          if ! find apks -maxdepth 1 -type f -name "*.apk" | grep -q .; then
+            echo "ERROR: No release APK was generated."
+            exit 1
+          fi
+
+          echo "APK files ready for verification:"
+          ls -lh apks/
+
+      - name: Verify APK is unsigned
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" \
+            -type f -name apksigner | sort -V | tail -n 1)
+
+          if [ -z "$APKSIGNER" ]; then
+            echo "ERROR: Android apksigner tool was not found."
+            exit 1
+          fi
+
+          for APK in apks/*.apk; do
+            echo "Checking $APK"
+
+            if "$APKSIGNER" verify "$APK" >/dev/null 2>&1; then
+              echo "ERROR: $APK is signed. Unsigned output was expected."
+              exit 1
+            else
+              echo "No valid Android APK signature detected."
+            fi
+          done
+
+      - name: Upload unsigned APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnimePlex-unsigned-APK
+          path: apks/*.apk
+          if-no-files-found: error
+          retention-days: 7
