@@ -70,7 +70,7 @@ const GitHubStarButton = ({primary}: GitHubStarButtonProps) => {
       onLayout={() => setButtonHandle(findNodeHandle(buttonRef.current))}
       nextFocusDown={isTV ? buttonHandle ?? undefined : undefined}
       accessibilityRole="button"
-      accessibilityLabel="Star Vega on GitHub"
+      accessibilityLabel="Follow AnimePlex on Instagram"
       focusable={isTV ? true : undefined}
       isTVSelectable={isTV ? true : undefined}
       onFocus={() => setIsFocused(true)}
@@ -87,7 +87,7 @@ const GitHubStarButton = ({primary}: GitHubStarButtonProps) => {
         style={animatedStyle}>
         <View className="flex-row items-center">
           <View className="relative items-center justify-center w-7 h-7">
-            <AntDesign name="github" size={22} color={primary} />
+            <AntDesign name="instagram" size={22} color={primary} />
             {celebrating &&
               sparklePositions.map((position, index) => (
                 <Animated.View
@@ -107,7 +107,7 @@ const GitHubStarButton = ({primary}: GitHubStarButtonProps) => {
             key={celebrating ? 'thanks' : 'star'}
             entering={FadeIn.duration(180)}
             className="text-white ml-3 text-base font-medium">
-            {celebrating ? 'You are a star!' : 'Star Vega on GitHub'}
+            {celebrating ? 'Thanks for following!' : 'Star Vega on GitHub'}
           </Animated.Text>
         </View>
         <Feather name="external-link" size={20} color="gray" />
