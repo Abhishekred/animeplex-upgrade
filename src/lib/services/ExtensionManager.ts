@@ -518,6 +518,15 @@ export class ExtensionManager {
     try {
       this.migrateLegacyCustomProviderSource();
 
+      // AnimePlex: configure the bundled provider source on first launch.
+      const defaultSourceUrl = 'https://github.com/sachinqzqz-web/vega-providers';
+      if (!extensionStorage.getProviderSources().some(s => s.author === 'sachinqzqz-web')) {
+        extensionStorage.addProviderSources('sachinqzqz-web', defaultSourceUrl);
+      }
+      if (!extensionStorage.getProviderSource()) {
+        extensionStorage.setDefaultProviderSource('sachinqzqz-web');
+      }
+
       // Load providers from cache
       const source = this.getActiveSource();
       const installed = extensionStorage.getInstalledProviders();
@@ -533,13 +542,37 @@ export class ExtensionManager {
         return;
       }
 
-      // Try to fetch latest manifest if cache is expired
-      if (extensionStorage.isManifestCacheExpired(source.author)) {
+      // Fetch the manifest so providers can be installed on first launch.
+      let manifest: ProviderExtension[] = available;
+      if (extensionStorage.isManifestCacheExpired(source.author) || manifest.length === 0) {
         try {
-          await this.fetchManifest(source, false);
+          manifest = await this.fetchManifest(source, false);
         } catch (error) {
           console.warn('Failed to refresh manifest on startup:', error);
+          manifest = extensionStorage.getManifestCache(source.author);
         }
+      }
+
+      // Install all enabled providers automatically; disabled providers stay opt-in.
+      const installedValues = new Set(
+        extensionStorage.getInstalledProviders().map(p => `${p.source?.author || ''}:${p.value}`),
+      );
+      for (const provider of manifest.filter(
+        item => !item.disabled && !installedValues.has(`${source.author}:${item.value}`),
+      )) {
+        try {
+          await this.installProvider(provider);
+        } catch (error) {
+          console.warn(`Failed to auto-install provider ${provider.value}:`, error);
+        }
+      }
+
+      const installedNow = extensionStorage.getInstalledProviders();
+      const movieBox = installedNow.find(p => p.value === 'movieBoxWeb');
+      if (movieBox) {
+        const store = require('../zustand/contentStore').default;
+        store.getState().setInstalledProviders(installedNow);
+        store.getState().setProvider(movieBox);
       }
     } catch (error) {
       console.error('Failed to initialize extension system:', error);
