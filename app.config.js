@@ -194,6 +194,7 @@ module.exports = () => {
         supportsPictureInPicture: true,
       },
       ios: {
+        bundleIdentifier: PACKAGE_NAME,
         ...(!IS_PLAYSTORE && hasIosGooglePlist
           ? {googleServicesFile: iosGoogleServicesFile}
           : {}),
