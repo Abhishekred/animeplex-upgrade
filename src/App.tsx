@@ -37,6 +37,7 @@ import Preferences from './screens/settings/Preference';
 import Appearance from './screens/settings/Appearance';
 import {M3ThemeProvider} from './theme/M3ThemeProvider';
 import {AppState, LogBox, useWindowDimensions} from 'react-native';
+import {checkAnimePlexRelease} from './lib/services/animePlexRelease';
 import {EpisodeLink, Stream} from './lib/providers/types';
 import {
   SafeAreaProvider,
@@ -652,6 +653,13 @@ const App = () => {
       unsubscribe();
     };
   }, [hasFirebase]);
+
+  // Check the release manifest published by the AnimePlex admin repository.
+  useEffect(() => {
+    checkAnimePlexRelease().catch(error =>
+      console.warn('[AnimePlex updates] Startup check failed:', error),
+    );
+  }, []);
 
   // Initialize update service
   useEffect(() => {
