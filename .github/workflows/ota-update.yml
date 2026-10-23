@@ -1,16 +1,6 @@
 name: Publish AnimePlex OTA Update
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'src/**'
-      - 'assets/**'
-      - 'index.js'
-      - 'app.config.js'
-      - 'package.json'
-      - 'package-lock.json'
   workflow_dispatch:
 
 permissions:
@@ -38,7 +28,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           if [ -z "$EXPO_TOKEN" ]; then
-            echo "Missing GitHub Actions secret EXPO_TOKEN. Add an Expo access token in repository Settings > Secrets and variables > Actions."
+            echo "Missing GitHub Actions secret EXPO_TOKEN."
             exit 1
           fi
-          npx eas-cli update --branch production --platform android --message "GitHub ${GITHUB_SHA}" --non-interactive
+          npx eas-cli update --branch production --platform android --message "Admin-triggered OTA ${GITHUB_SHA}" --non-interactive
