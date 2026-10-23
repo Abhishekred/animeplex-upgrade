@@ -149,7 +149,7 @@ module.exports = () => {
       version: '5.2.1',
       runtimeVersion: {policy: 'appVersion'},
       updates: {
-        url: 'https://u.expo.dev/40d98354-d3c8-4616-ab2e-70d9c297091f',
+        url: 'https://u.expo.dev/f7e0cdf5-d218-45e0-bfc5-4ad4741c2048',
         enabled: true,
         checkAutomatically: 'ON_LOAD',
         fallbackToCacheTimeout: 0,
@@ -210,7 +210,7 @@ module.exports = () => {
       platforms: ['ios', 'android'],
       extra: {
         eas: {
-          projectId: '40d98354-d3c8-4616-ab2e-70d9c297091f',
+          projectId: 'f7e0cdf5-d218-45e0-bfc5-4ad4741c2048',
         },
         hasFirebase: HAS_FIREBASE,
         isPlayStore: IS_PLAYSTORE,
