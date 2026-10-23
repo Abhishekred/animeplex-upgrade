@@ -93,7 +93,7 @@ const downloadUpdate = async (url: string, name: string) => {
   }
 };
 
-// handle check for update
+// Check the public release manifest managed by the AnimePlex admin panel.
 export const checkForUpdate = async (
   setUpdateLoading: React.Dispatch<React.SetStateAction<boolean>>,
   autoDownload: boolean,
@@ -102,32 +102,29 @@ export const checkForUpdate = async (
   setUpdateLoading(true);
   try {
     const res = await fetch(
-      'https://abhixtinku.online/updates',
+      'https://animeplex-admin-panel.vercel.app/api/release',
+      {headers: {'Cache-Control': 'no-cache'}},
     );
-    if (res.status === 403 || res.status === 429) {
-      ToastAndroid.show(
-        'GitHub API rate limit exceeded. Please wait a few minutes before trying again.',
-        ToastAndroid.LONG,
-      );
-      setUpdateLoading(false);
-      return;
-    }
     if (!res.ok) {
-      throw new Error(`GitHub release check failed with status ${res.status}`);
+      throw new Error(`Admin release check failed with status ${res.status}`);
     }
+
     const data = await res.json();
-    if (!data?.tag_name) {
-      throw new Error('Invalid release data received from GitHub');
+    if (
+      !data?.version ||
+      !Number.isInteger(Number(data.versionCode)) ||
+      typeof data.version !== 'string'
+    ) {
+      throw new Error('Invalid release manifest received from AnimePlex admin');
     }
-    const localVersion = Application.nativeApplicationVersion;
-    const remoteVersion = Number(
-      data.tag_name.replace('v', '')?.split('.').join(''),
-    );
-    if (compareVersions(localVersion || '', data.tag_name.replace('v', ''))) {
+
+    const remoteVersion = data.version.replace(/^v/i, '');
+    const localVersion = Application.nativeApplicationVersion || '';
+    if (compareVersions(localVersion, remoteVersion)) {
       ToastAndroid.show('New update available', ToastAndroid.SHORT);
       showAppDialog({
-        title: `Update v${localVersion} -> ${data.tag_name}`,
-        message: data.body,
+        title: `Update v${localVersion} -> v${remoteVersion}`,
+        message: data.releaseNotes || data.title || 'A new AnimePlex update is available.',
         messageFormat: 'markdown',
         actions: [
           {label: 'Cancel'},
@@ -135,54 +132,30 @@ export const checkForUpdate = async (
             label: 'Update',
             variant: 'primary',
             onPress: () => {
-              const targetKeyword = isTV ? 'tv' : 'mobile';
-              const apkAsset =
-                data?.assets?.find(
-                  (asset: any) =>
-                    asset.name?.endsWith('.apk') &&
-                    asset.name?.toLowerCase().includes(targetKeyword),
-                ) ||
-                data?.assets?.find(
-                  (asset: any) =>
-                    asset.name?.endsWith('.apk') &&
-                    asset.name?.toLowerCase().includes('universal'),
-                ) ||
-                data?.assets?.find((asset: any) =>
-                  asset.name?.endsWith('.apk'),
-                );
-              return autoDownload && apkAsset
-                ? downloadUpdate(apkAsset.browser_download_url, apkAsset.name)
-                : Linking.openURL(data.html_url);
+              const apkUrl =
+                typeof data.apkUrl === 'string' && data.apkUrl.startsWith('https://')
+                  ? data.apkUrl
+                  : null;
+              return autoDownload && apkUrl
+                ? downloadUpdate(apkUrl, `AnimePlex-${remoteVersion}.apk`)
+                : Linking.openURL(
+                    apkUrl || 'https://animeplex-admin-panel.vercel.app/',
+                  );
             },
           },
         ],
       });
-      console.log(
-        'local version',
-        localVersion,
-        'remote version',
-        remoteVersion,
-      );
+      console.log('local version', localVersion, 'remote version', remoteVersion);
     } else {
       showToast && ToastAndroid.show('App is up to date', ToastAndroid.SHORT);
-      console.log(
-        'local version',
-        localVersion,
-        'remote version',
-        remoteVersion,
-      );
+      console.log('local version', localVersion, 'remote version', remoteVersion);
     }
   } catch (error) {
-    const isRateLimit =
-      error instanceof Error &&
-      error.message.toLowerCase().includes('rate limit');
-    const msg = isRateLimit
-      ? 'GitHub API rate limit exceeded. Please wait a few minutes before trying again.'
-      : 'Failed to check for update';
-    ToastAndroid.show(msg, ToastAndroid.SHORT);
+    ToastAndroid.show('Failed to check for update', ToastAndroid.SHORT);
     console.log('Update error', error);
+  } finally {
+    setUpdateLoading(false);
   }
-  setUpdateLoading(false);
 };
 
 const About = ({navigation}: any) => {
