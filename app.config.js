@@ -121,6 +121,7 @@ module.exports = () => {
         launchMode: 'most-recent',
       },
     ],
+    'expo-updates',
     'expo-font',
     'expo-status-bar',
     ...(IS_TV
@@ -146,6 +147,13 @@ module.exports = () => {
       plugins,
       slug: 'vega',
       version: '5.2.1',
+      runtimeVersion: {policy: 'appVersion'},
+      updates: {
+        url: 'https://u.expo.dev/40d98354-d3c8-4616-ab2e-70d9c297091f',
+        enabled: true,
+        checkAutomatically: 'ON_LOAD',
+        fallbackToCacheTimeout: 0,
+      },
       userInterfaceStyle: 'dark',
       experiments: {
         reactCompiler: true,
