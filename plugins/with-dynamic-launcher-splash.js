@@ -195,9 +195,7 @@ const writeLauncherResources = (resRoot, projectRoot) => {
       path.join(drawable, `ic_launcher_foreground_${id}.xml`),
       `<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
     android:gravity="center"
-    android:src="@drawable/aplogo"
-    android:tint="${variant.color}"
-    android:tintMode="src_in" />\n`,
+    android:src="@drawable/aplogo" />\n`,
     );
     fs.writeFileSync(
       path.join(drawableV26, `ic_launcher_${id}.xml`),
@@ -230,8 +228,10 @@ const copySplashResources = (projectRoot, resRoot) => {
     fs.mkdirSync(targetDir, {recursive: true});
     for (const variant of variants) {
       const filename = `bootsplash_logo_${variant.id.toLowerCase()}.png`;
+      // Keep every splash variant identical to the single AnimePlex logo.
+      // Use the source logo directly instead of stale/generated variant artwork.
       fs.copyFileSync(
-        path.join(sourceDir, filename),
+        path.join(projectRoot, 'assets', 'aplogo.png'),
         path.join(targetDir, filename),
       );
     }
