@@ -194,7 +194,7 @@ const writeLauncherResources = (resRoot, projectRoot) => {
     fs.writeFileSync(
       path.join(drawable, `ic_launcher_foreground_${id}.xml`),
       `<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:gravity="center"
+    android:gravity="fill"
     android:src="@drawable/aplogo" />\n`,
     );
     fs.writeFileSync(
