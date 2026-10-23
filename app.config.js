@@ -145,7 +145,7 @@ module.exports = () => {
       newArchEnabled: true,
       autolinking: {exclude: ['expo-splash-screen']},
       plugins,
-      slug: 'vega',
+      slug: 'animeplex',
       version: '5.2.1',
       runtimeVersion: {policy: 'appVersion'},
       updates: {
