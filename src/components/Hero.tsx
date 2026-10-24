@@ -582,19 +582,21 @@ const Hero = memo(
               top: insets.top + (isTV ? 16 : 6),
               zIndex: 30,
             }}>
-            <HeroTopButton
-              ref={hamburgerRef}
-              onLayout={updateHamburgerNode}
-              icon="menu"
-              iconColor={searchButtonColor}
-              label="Open provider drawer"
-              disabled={isDrawerOpen}
-              hasTVPreferredFocus={isTV && !isDrawerOpen}
-              nextFocusRight={searchNode ?? undefined}
-              nextFocusDown={watchNowNode ?? undefined}
-              nextFocusUp={hamburgerNode ?? undefined}
-              onPress={onOpenDrawer}
-            />
+{isTV ? (
+              <HeroTopButton
+                ref={hamburgerRef}
+                onLayout={updateHamburgerNode}
+                icon="menu"
+                iconColor={searchButtonColor}
+                label="Open provider drawer"
+                disabled={isDrawerOpen}
+                hasTVPreferredFocus={isTV && !isDrawerOpen}
+                nextFocusRight={searchNode ?? undefined}
+                nextFocusDown={watchNowNode ?? undefined}
+                nextFocusUp={hamburgerNode ?? undefined}
+                onPress={onOpenDrawer}
+              />
+            ) : null}
             <HeroTopButton
               ref={searchRef}
               onLayout={updateSearchNode}
