@@ -1,0 +1,19 @@
+name = "animeplex-watch-party"
+main = "src/index.ts"
+compatibility_date = "2026-10-20"
+workers_dev = true
+
+[vars]
+# Optional comma-separated origins. Keep "*" for native mobile clients unless you also host a web client.
+ALLOWED_ORIGINS = "*"
+
+[[durable_objects.bindings]]
+name = "WATCH_PARTY_ROOMS"
+class_name = "WatchPartyRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["WatchPartyRoom"]
+
+# Configure the signing secret with:
+# npx wrangler secret put SESSION_SECRET
