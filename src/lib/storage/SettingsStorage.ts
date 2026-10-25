@@ -29,6 +29,7 @@ export enum SettingsKeys {
   // Update settings
   AUTO_CHECK_UPDATE = 'autoCheckUpdate',
   AUTO_DOWNLOAD = 'autoDownload',
+  AUTO_UPDATE_PROVIDERS = 'autoUpdateProviders',
 
   // Player settings
   OPEN_VIDEOS_FROM_OTHER_APPS = 'openVideosFromOtherApps',
@@ -329,6 +330,14 @@ export class SettingsStorage {
   // Update settings
   isAutoCheckUpdateEnabled(): boolean {
     return mainStorage.getBool(SettingsKeys.AUTO_CHECK_UPDATE, true);
+  }
+
+  isProviderAutoUpdateEnabled(): boolean {
+    return mainStorage.getBool(SettingsKeys.AUTO_UPDATE_PROVIDERS, true);
+  }
+
+  setProviderAutoUpdateEnabled(enabled: boolean): void {
+    mainStorage.setBool(SettingsKeys.AUTO_UPDATE_PROVIDERS, enabled);
   }
 
   setAutoCheckUpdateEnabled(enabled: boolean): void {

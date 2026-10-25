@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import React, {useState, useCallback} from 'react';
 import {settingsStorage} from '../../lib/storage';
+import {updateProvidersService} from '../../lib/services/UpdateProviders';
 import Constants from 'expo-constants';
 import DownloadLocationPreference from './components/DownloadLocationPreference';
 import useNavigationPreferencesStore from '../../lib/zustand/navigationPreferencesStore';
@@ -103,6 +104,7 @@ const Preferences = ({navigation}: any) => {
   const [hapticFeedback, setHapticFeedback] = useState(() =>
     settingsStorage.isHapticFeedbackEnabled(),
   );
+  const [providerAutoUpdates, setProviderAutoUpdates] = useState(() => settingsStorage.isProviderAutoUpdateEnabled());
 
   const [alwaysUseExternalDownload, setAlwaysUseExternalDownload] = useState(
     () => settingsStorage.getBool('alwaysExternalDownloader') || false,
@@ -160,6 +162,15 @@ const Preferences = ({navigation}: any) => {
             Manage app behavior, privacy, and downloads
           </AppText>
 
+          <SettingsSection title="Providers">
+            <SettingsSwitchRow title="Auto update providers"
+              description="Install provider updates automatically. Turn off to review and install updates manually in Extensions."
+              value={providerAutoUpdates} onValueChange={next => {
+                settingsStorage.setProviderAutoUpdateEnabled(next);
+                setProviderAutoUpdates(next);
+                if (next) void updateProvidersService.checkForUpdatesAndAutoUpdate().catch(error => console.warn('Provider update check failed:', error));
+              }}/>
+          </SettingsSection>
           <SettingsSection title="Experience">
             <SettingsSwitchRow
               title="Haptic feedback"

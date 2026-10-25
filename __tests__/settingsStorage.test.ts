@@ -41,6 +41,7 @@ describe('settings defaults', () => {
     expect(settingsStorage.isHapticFeedbackEnabled()).toBe(true);
     expect(settingsStorage.isNotificationsEnabled()).toBe(true);
     expect(settingsStorage.isAutoCheckUpdateEnabled()).toBe(true);
+    expect(settingsStorage.isProviderAutoUpdateEnabled()).toBe(true);
     expect(settingsStorage.showMediaControls()).toBe(true);
     expect(settingsStorage.showHamburgerMenu()).toBe(true);
     expect(settingsStorage.isSwipeGestureEnabled()).toBe(true);
@@ -57,6 +58,15 @@ describe('settings defaults', () => {
     expect(settingsStorage.hideSeekButtons()).toBe(false);
     expect(settingsStorage.isEnable2xGestureEnabled()).toBe(false);
     expect(settingsStorage.isSkipInAppWebview()).toBe(false);
+  });
+
+  it('persists provider auto-updates independently from app update preferences', () => {
+    settingsStorage.setProviderAutoUpdateEnabled(false);
+    expect(settingsStorage.isProviderAutoUpdateEnabled()).toBe(false);
+    expect(mockBooleanValues.get(SettingsKeys.AUTO_UPDATE_PROVIDERS)).toBe(false);
+    expect(settingsStorage.isAutoCheckUpdateEnabled()).toBe(true);
+    settingsStorage.setProviderAutoUpdateEnabled(true);
+    expect(settingsStorage.isProviderAutoUpdateEnabled()).toBe(true);
   });
 
   it('keeps "ask for local file first" strictly opt-in', () => {
