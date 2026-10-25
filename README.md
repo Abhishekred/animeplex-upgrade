@@ -24,7 +24,7 @@ ___
 
 [![Download Apk](https://custom-icon-badges.demolab.com/badge/-Download_From_Github-black?style=for-the-badge&logo=download&logoColor=white)](https://github.com/vega-org/vega-app/releases/latest)
 
-[![Download Apk](https://custom-icon-badges.demolab.com/badge/-Website-tomato?style=for-the-badge&logo=download&logoColor=white)](https://vega.8man.in/#mobile)
+[![Download Apk](https://custom-icon-badges.demolab.com/badge/-Website-tomato?style=for-the-badge&logo=download&logoColor=white)](https://vega-app.in/#mobile)
 
 ## Vega for Desktop 
 https://github.com/vega-org/vega-desktop
