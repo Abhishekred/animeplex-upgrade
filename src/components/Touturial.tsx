@@ -143,16 +143,7 @@ const Tutorial = () => {
           color={colors.onSurfaceVariant}
           style={{marginBottom: 16}}
         />
-        <Text
-          style={{
-            color: colors.onSurface,
-            fontSize: 24,
-            fontWeight: '700',
-            textAlign: 'center',
-            marginBottom: 16,
-          }}>
-          No Provider Installed
-        </Text>
+        {/* Hidden for AnimePlex home branding. */}
         <Text
           style={{
             color: colors.onSurfaceVariant,
@@ -164,34 +155,7 @@ const Tutorial = () => {
           Connect your cloud provider to play network streams or play local
           content.
         </Text>
-        <TVFocusable
-          ref={installButtonRef}
-          onPress={handleGoToExtensions}
-          hasTVPreferredFocus={true}
-          accessibilityLabel="Install Cloud Providers"
-          accessibilityRole="button"
-          borderRadius={12}
-          focusBorderColor={colors.onPrimary}
-          style={{width: '100%'}}>
-          <View
-            className="px-6 py-3 rounded-xl w-full flex-row items-center justify-center"
-            style={{backgroundColor: colors.primary}}>
-            <MaterialCommunityIcons
-              name="download"
-              size={20}
-              color={colors.onPrimary}
-            />
-            <Text
-              style={{
-                color: colors.onPrimary,
-                fontSize: 16,
-                fontWeight: '600',
-                marginLeft: 8,
-              }}>
-              Install Cloud Providers
-            </Text>
-          </View>
-        </TVFocusable>
+        {/* Provider installation CTA hidden on home. */}
         <TVFocusable
           onPress={handlePlayLocalFile}
           accessibilityLabel="Play local file"
