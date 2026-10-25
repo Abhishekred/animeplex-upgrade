@@ -70,6 +70,12 @@ const Home = ({}: Props) => {
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const [isAtTop, setIsAtTop] = useState(true);
   const [heroVisible, setHeroVisible] = useState(true);
+  // Avoid flashing the first-run empty state while persisted provider state hydrates.
+  const [startupGraceElapsed, setStartupGraceElapsed] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setStartupGraceElapsed(true), 900);
+    return () => clearTimeout(timer);
+  }, []);
   const showContinueWatching = useNavigationPreferencesStore(
     state => state.showContinueWatching,
   );
@@ -273,12 +279,15 @@ const Home = ({}: Props) => {
     );
   }, [error, isLoading, homeData.length]);
 
-  // Early return for no providers
+  // Avoid a cold-start flash while persisted providers finish hydrating.
   if (
     !installedProviders ||
     installedProviders.length === 0 ||
     !provider?.value
   ) {
+    if (!startupGraceElapsed) {
+      return <View className="flex-1 bg-m3-background" />;
+    }
     return <ScrollView contentContainerStyle={{flexGrow: 1, paddingTop: isTV ? 12 : 32}}>
       {showContinueWatching && <ContinueWatching localOnly />}
       <View style={{flex: 1, minHeight: 400}}><Tutorial /></View>
