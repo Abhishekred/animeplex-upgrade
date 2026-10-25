@@ -554,26 +554,59 @@ export class ExtensionManager {
         }
       }
 
-      // Install all enabled providers automatically; disabled providers stay opt-in.
-      const installedValues = new Set(
-        extensionStorage.getInstalledProviders().map(p => `${p.source?.author || ''}:${p.value}`),
+      // Publish cached installs to the UI before any network work.
+      const initialInstalled = extensionStorage.getInstalledProviders();
+      useContentStore.getState().setInstalledProviders(initialInstalled);
+
+      // Install one usable provider first so the first launch can show Home
+      // without waiting for every provider module to download.
+      const installedKeys = new Set(
+        initialInstalled.map(p => `${p.source?.author || ''}:${p.value}`),
       );
-      for (const provider of manifest.filter(
-        item => !item.disabled && !installedValues.has(`${source.author}:${item.value}`),
-      )) {
+      const pendingProviders = manifest.filter(
+        item => !item.disabled && !installedKeys.has(`${source.author}:${item.value}`),
+      );
+      pendingProviders.sort((a, b) =>
+        Number(b.value === 'movieBoxWeb') - Number(a.value === 'movieBoxWeb'),
+      );
+
+      const firstProvider = pendingProviders.shift();
+      if (firstProvider) {
         try {
-          await this.installProvider(provider);
+          await this.installProvider(firstProvider);
         } catch (error) {
-          console.warn(`Failed to auto-install provider ${provider.value}:`, error);
+          console.warn(`Failed to install startup provider ${firstProvider.value}:`, error);
         }
       }
 
-      const installedNow = extensionStorage.getInstalledProviders();
-      const movieBox = installedNow.find(p => p.value === 'movieBoxWeb');
-      if (movieBox) {
-        useContentStore.getState().setInstalledProviders(installedNow);
-        useContentStore.getState().setProvider(movieBox);
+      const installedAfterFirst = extensionStorage.getInstalledProviders();
+      const preferredProvider =
+        installedAfterFirst.find(p => p.value === 'movieBoxWeb') ||
+        installedAfterFirst[0];
+      useContentStore.getState().setInstalledProviders(installedAfterFirst);
+      if (preferredProvider && !useContentStore.getState().provider.value) {
+        useContentStore.getState().setProvider(preferredProvider);
       }
+
+      // Finish installing remaining enabled providers in the background.
+      // The Home screen becomes usable as soon as the first provider is ready.
+      void (async () => {
+        for (const provider of pendingProviders) {
+          try {
+            await this.installProvider(provider);
+            const installedNow = extensionStorage.getInstalledProviders();
+            useContentStore.getState().setInstalledProviders(installedNow);
+            const active = useContentStore.getState().provider;
+            if (!active?.value) {
+              const preferred =
+                installedNow.find(p => p.value === 'movieBoxWeb') || installedNow[0];
+              if (preferred) useContentStore.getState().setProvider(preferred);
+            }
+          } catch (error) {
+            console.warn(`Failed to auto-install provider ${provider.value}:`, error);
+          }
+        }
+      })();
     } catch (error) {
       console.error('Failed to initialize extension system:', error);
     }
