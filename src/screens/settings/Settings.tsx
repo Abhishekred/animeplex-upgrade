@@ -415,7 +415,7 @@ const Settings = ({navigation}: Props) => {
             <AnimatedSection delay={400}>
               <SettingsSection title="About">
                 <SettingsRow
-                  title="About Vega"
+                  title="About AnimePlex"
                   icon="information-outline"
                   onPress={() => navigation.navigate('About')}
                 />

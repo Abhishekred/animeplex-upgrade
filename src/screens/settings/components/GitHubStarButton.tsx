@@ -107,7 +107,7 @@ const GitHubStarButton = ({primary}: GitHubStarButtonProps) => {
             key={celebrating ? 'thanks' : 'star'}
             entering={FadeIn.duration(180)}
             className="text-white ml-3 text-base font-medium">
-            {celebrating ? 'Thanks for following!' : 'Star Vega on GitHub'}
+            {celebrating ? 'Thanks for following AnimePlex!' : 'Follow AnimePlex on Instagram'}
           </Animated.Text>
         </View>
         <Feather name="external-link" size={20} color="gray" />

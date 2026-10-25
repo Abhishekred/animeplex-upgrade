@@ -198,7 +198,7 @@ const SearchResults = ({route, navigation}: Props): React.ReactElement => {
         <Slider
           isLoading={loadingState?.isLoading || false}
           key={`${item.value}-${isEmptyResult ? 'empty' : 'data'}`}
-          title={item.name}
+          title={`AnimePlex Server ${index + 1}`}
           posts={posts}
           filter={route.params.filter}
           providerValue={item.value}
