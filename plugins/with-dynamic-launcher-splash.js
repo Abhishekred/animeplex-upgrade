@@ -185,9 +185,12 @@ const writeLauncherResources = (resRoot, projectRoot) => {
   const aplogoSource = path.join(projectRoot, 'assets', 'aplogo.png');
   const drawableNodpi = path.join(resRoot, 'drawable-nodpi');
   fs.mkdirSync(drawableNodpi, {recursive: true});
-  const iconSource = fs.existsSync(aplogoSource)
-    ? aplogoSource
-    : path.join(projectRoot, 'assets', 'adaptive_icon.png');
+  // Use the dedicated adaptive icon artwork when available. It is designed
+  // for Android's circular/squircle launcher masks and preserves safe padding.
+  const adaptiveIconSource = path.join(projectRoot, 'assets', 'adaptive_icon.png');
+  const iconSource = fs.existsSync(adaptiveIconSource)
+    ? adaptiveIconSource
+    : aplogoSource;
   fs.copyFileSync(iconSource, path.join(drawableNodpi, 'aplogo.png'));
   for (const variant of variants) {
     const id = variant.id.toLowerCase();
