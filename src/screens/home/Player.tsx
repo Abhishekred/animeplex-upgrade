@@ -2683,9 +2683,27 @@ const Player = ({route}: Props): React.JSX.Element => {
 
     if (!hasSetInitialAudioRef.current && audioTracks.length > 0) {
       hasSetInitialAudioRef.current = true;
-      const audioTrackIndex = audioTracks.findIndex(
+      const savedAudioTrackIndex = audioTracks.findIndex(
         track => track.language === lastAudioTrack,
       );
+      // Prefer Hindi on first playback, but preserve an explicitly saved track.
+      const hindiAudioTrackIndex = audioTracks.findIndex(track => {
+        const language = String(track.language || '').toLowerCase();
+        const title = String(track.title || '').toLowerCase();
+        return (
+          language === 'hi' ||
+          language === 'hin' ||
+          language === 'hindi' ||
+          language.startsWith('hi-') ||
+          title.includes('hindi')
+        );
+      });
+      const audioTrackIndex =
+        lastAudioTrack !== 'auto' && savedAudioTrackIndex !== -1
+          ? savedAudioTrackIndex
+          : hindiAudioTrackIndex !== -1
+            ? hindiAudioTrackIndex
+            : savedAudioTrackIndex;
       if (audioTrackIndex !== -1) {
         setSelectedAudioTrack({
           type: SelectedTrackType.INDEX,
