@@ -576,10 +576,34 @@ export class ExtensionManager {
   private async autoInstallDefaultProviders(source: ProviderSource): Promise<void> {
     try {
       const providers = await this.fetchManifest(source, false);
-      // Sequential installation avoids overwhelming low-memory devices.
-      for (const provider of providers) {
+      const orderedProviders = [...providers].sort((left, right) => {
+        const isMovieBox = (provider: ProviderExtension) =>
+          provider.value.toLowerCase() === 'movieboxweb' ||
+          provider.display_name.toLowerCase() === 'moviebox web';
+        return Number(isMovieBox(right)) - Number(isMovieBox(left));
+      });
+      let defaultProviderSelected = false;
+
+      // Install sequentially to avoid overwhelming low-memory devices. MovieBox
+      // is first so the home screen can become usable before the remaining sources finish.
+      for (const provider of orderedProviders) {
         try {
           await this.installProvider(provider);
+          const latestInstalled = extensionStorage.getInstalledProviders();
+          useContentStore.getState().setInstalledProviders(latestInstalled);
+
+          if (!defaultProviderSelected && latestInstalled.length > 0) {
+            const movieBox = latestInstalled.find(
+              item => item.value.toLowerCase() === 'movieboxweb',
+            );
+            if (movieBox) {
+              useContentStore.getState().setProvider(movieBox);
+              defaultProviderSelected = true;
+            } else if (provider.value.toLowerCase() === 'movieboxweb') {
+              useContentStore.getState().setProvider(provider);
+              defaultProviderSelected = true;
+            }
+          }
         } catch (error) {
           console.warn('Skipping provider that failed to install:', provider.value, error);
         }
@@ -587,13 +611,13 @@ export class ExtensionManager {
 
       const latestInstalled = extensionStorage.getInstalledProviders();
       if (latestInstalled.length > 0) {
-        const movieBox = latestInstalled.find(
-          provider =>
-            provider.value.toLowerCase() === 'movieboxweb' ||
-            provider.display_name.toLowerCase() === 'moviebox web',
-        );
         useContentStore.getState().setInstalledProviders(latestInstalled);
-        useContentStore.getState().setProvider(movieBox || latestInstalled[0]);
+        const movieBox = latestInstalled.find(
+          provider => provider.value.toLowerCase() === 'movieboxweb',
+        );
+        if (!useContentStore.getState().provider.value) {
+          useContentStore.getState().setProvider(movieBox || latestInstalled[0]);
+        }
       }
     } catch (error) {
       console.warn('Automatic provider setup failed; users can retry from Provider Manager:', error);
