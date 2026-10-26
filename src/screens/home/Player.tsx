@@ -2739,11 +2739,27 @@ const Player = ({route}: Props): React.JSX.Element => {
     if (!hasSetInitialAudioRef.current && audioTracks.length > 0) {
       hasSetInitialAudioRef.current = true;
       const hindiTrackIndex = audioTracks.findIndex(track => {
-        const language = String(track.language || '').toLowerCase();
-        const title = String(track.title || '').toLowerCase();
-        return ['hi', 'hin', 'hindi'].includes(language) ||
-          language.startsWith('hi-') ||
-          title.includes('hindi');
+        // Providers expose language metadata inconsistently: Hindi may appear
+        // as "hi"/"hin", "Hindi dub", or only in the track title/label.
+        const metadata = [
+          track.language,
+          track.title,
+          (track as any).name,
+          (track as any).label,
+          (track as any).displayName,
+        ]
+          .filter(Boolean)
+          .map(value => String(value).trim().toLowerCase());
+
+        return metadata.some(value =>
+          value === 'hi' ||
+          value === 'hin' ||
+          value === 'hindi' ||
+          value === 'hi-in' ||
+          value.startsWith('hi-') ||
+          /(^|[\s()[\]_-])hindi([\s()[\]_-]|$)/i.test(value) ||
+          /हिंदी/.test(value),
+        );
       });
       const savedTrackIndex = savedAudioTrack && savedAudioTrack !== 'auto'
         ? audioTracks.findIndex(track => track.language === savedAudioTrack)
@@ -2756,11 +2772,18 @@ const Player = ({route}: Props): React.JSX.Element => {
           ? savedTrackIndex
           : audioTracks.findIndex(track => track.language === 'auto');
       if (audioTrackIndex !== -1) {
+        // Select by the real media track index so the choice changes playback,
+        // not just the highlighted row in the Audio menu.
+        const selectedTrack = audioTracks[audioTrackIndex];
+        const selectedLanguage = String(selectedTrack?.language || '');
         setSelectedAudioTrack({
           type: SelectedTrackType.INDEX,
           value: audioTrackIndex,
         });
         setSelectedAudioTrackIndex(audioTrackIndex);
+        if (hindiTrackIndex !== -1 && selectedLanguage) {
+          cacheStorage.setString('lastAudioTrack', selectedLanguage);
+        }
       }
     }
 
