@@ -2733,14 +2733,23 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   // Set last selected audio and subtitle tracks
   useEffect(() => {
-    const lastAudioTrack = cacheStorage.getString('lastAudioTrack') || 'auto';
+    const savedAudioTrack = cacheStorage.getString('lastAudioTrack');
     const lastTextTrack = cacheStorage.getString('lastTextTrack') || 'auto';
 
     if (!hasSetInitialAudioRef.current && audioTracks.length > 0) {
       hasSetInitialAudioRef.current = true;
-      const audioTrackIndex = audioTracks.findIndex(
-        track => track.language === lastAudioTrack,
-      );
+      const hindiTrackIndex = audioTracks.findIndex(track => {
+        const language = String(track.language || '').toLowerCase();
+        const title = String(track.title || '').toLowerCase();
+        return ['hi', 'hin', 'hindi'].includes(language) ||
+          language.startsWith('hi-') ||
+          title.includes('hindi');
+      });
+      const audioTrackIndex = savedAudioTrack
+        ? audioTracks.findIndex(track => track.language === savedAudioTrack)
+        : hindiTrackIndex !== -1
+          ? hindiTrackIndex
+          : audioTracks.findIndex(track => track.language === 'auto');
       if (audioTrackIndex !== -1) {
         setSelectedAudioTrack({
           type: SelectedTrackType.INDEX,
