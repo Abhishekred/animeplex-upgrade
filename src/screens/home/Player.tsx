@@ -150,6 +150,7 @@ import {
   shouldAutoPlayNext,
 } from '../../lib/player/autoNext';
 import {useSleepTimer} from '../../lib/hooks/useSleepTimer';
+import {sendViewerHeartbeat} from '../../lib/services/remoteAdmin';
 import {useNextEpisodePrefetch} from '../../lib/hooks/useNextEpisodePrefetch';
 
 import {
@@ -888,6 +889,41 @@ const Player = ({route}: Props): React.JSX.Element => {
           Boolean((route.params as any)?.alwaysCast) ||
           settingsStorage.isAlwaysCastMode())),
   });
+
+  // Report real active playback to the AnimePlex admin dashboard. Telemetry is
+  // anonymous and best-effort; network errors never interrupt playback.
+  const adminPlaybackStartedAt = useRef(new Date().toISOString());
+  useEffect(() => {
+    adminPlaybackStartedAt.current = new Date().toISOString();
+  }, [activeEpisodeKey]);
+  useEffect(() => {
+    if (
+      route.params.localContent ||
+      !selectedStream?.link ||
+      !route.params.primaryTitle
+    ) {
+      return;
+    }
+    const report = () => {
+      void sendViewerHeartbeat({
+        title: String(route.params.primaryTitle || activeEpisode?.title || 'Unknown title'),
+        season: String(route.params.secondaryTitle || ''),
+        episode: String(activeEpisode?.title || ''),
+        platform: isTV ? 'android-tv' : 'android',
+        startedAt: adminPlaybackStartedAt.current,
+      });
+    };
+    report();
+    const interval = setInterval(report, 20_000);
+    return () => clearInterval(interval);
+  }, [
+    activeEpisode?.title,
+    activeEpisodeKey,
+    route.params.localContent,
+    route.params.primaryTitle,
+    route.params.secondaryTitle,
+    selectedStream?.link,
+  ]);
 
   // Custom hooks for video settings
   const {
