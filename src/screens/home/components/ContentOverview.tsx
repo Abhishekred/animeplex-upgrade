@@ -346,7 +346,7 @@ const ContentOverview = ({
             <AppText
               role="titleLargeEmphasized"
               style={{color: colors.onBackground, marginRight: 12}}>
-              Synopsis
+              AnimePlex server
             </AppText>
             <AppText
               role="labelLargeEmphasized"
@@ -408,7 +408,7 @@ const ContentOverview = ({
           }}>
           <InfoAction icon="magnify" label="Search" onPress={onSearchTitle} />
           {onOpenWeb ? (
-            <InfoAction icon="web" label="Web" onPress={onOpenWeb} />
+            <InfoAction icon="instagram" label="Instagram" onPress={onOpenWeb} />
           ) : null}
           {onOpenStory ? (
             <InfoAction
