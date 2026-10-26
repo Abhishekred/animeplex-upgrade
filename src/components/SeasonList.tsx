@@ -518,11 +518,21 @@ const SeasonListContent: React.FC<SeasonListProps> = ({
     lastPlayedKeyRef.current = lastPlayedKey;
   }, [lastPlayedKey]);
 
-  // Memoized initial active season
+  // Default to Hindi dub when the provider offers it. The detail-page
+  // dropdown is backed by LinkList (not the player's media tracks), and older
+  // cached "Original Audio" selections must not hide an available Hindi dub.
   const [activeSeason, setActiveSeason] = useState<Link>(() => {
     if (!LinkList || LinkList.length === 0) {
       return {} as Link;
     }
+
+    const hindiDub = LinkList.find(link => {
+      const title = String(link.title || '').toLowerCase();
+      return title.includes('hindi') && title.includes('dub');
+    });
+    const anyHindiOption = LinkList.find(link =>
+      String(link.title || '').toLowerCase().includes('hindi'),
+    );
 
     const cached = cacheStorage.getString(
       `ActiveSeason${metaTitle + providerValue}`,
@@ -531,19 +541,26 @@ const SeasonListContent: React.FC<SeasonListProps> = ({
     if (cached) {
       try {
         const parsedSeason = JSON.parse(cached);
-        // Verify the cached season still exists in LinkList
         const seasonExists = LinkList.find(
           link => link.title === parsedSeason.title,
         );
+        // Preserve a saved Hindi choice. If the old cache points at Original
+        // Audio or another language, prefer the available Hindi dub instead.
+        if (seasonExists && String(seasonExists.title || '').toLowerCase().includes('hindi')) {
+          return seasonExists;
+        }
+        if (hindiDub || anyHindiOption) {
+          return hindiDub || anyHindiOption!;
+        }
         if (seasonExists) {
-          return parsedSeason;
+          return seasonExists;
         }
       } catch (error) {
         console.warn('Failed to parse cached season:', error);
       }
     }
 
-    return LinkList[0];
+    return hindiDub || anyHindiOption || LinkList[0];
   });
 
   // React Query for episodes
