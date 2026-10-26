@@ -2,7 +2,7 @@ import * as Crypto from 'expo-crypto';
 
 export const ANIMEPLEX_ADMIN_ORIGIN = 'https://animeplex-admin-panel.vercel.app';
 const CONFIG_URL = `${ANIMEPLEX_ADMIN_ORIGIN}/api/config`;
-const TELEMETRY_URL = `${ANIMEPLEX_ADMIN_ORIGIN}/api/telemetry';
+const TELEMETRY_URL = `${ANIMEPLEX_ADMIN_ORIGIN}/api/telemetry`;
 
 export type RemoteAdminConfig = {
   app?: string;
