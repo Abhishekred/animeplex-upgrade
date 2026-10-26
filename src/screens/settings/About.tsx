@@ -277,7 +277,7 @@ const About = ({navigation}: any) => {
             <AppText
               role="headlineLargeEmphasized"
               className="text-m3-on-background">
-              About Vega
+              About AnimePlex
             </AppText>
           </View>
           <AppText role="bodyLarge" className="mt-1 text-m3-on-surface-variant">
@@ -288,7 +288,7 @@ const About = ({navigation}: any) => {
         <SettingsSection title="App">
           <SettingsRow
             title="Version"
-            description={`Vega ${Application.nativeApplicationVersion || ''}`}
+            description={`AnimePlex ${Application.nativeApplicationVersion || ''}`}
             icon="information-outline"
             divider={Constants.expoConfig?.extra?.isPlayStore}
           />
