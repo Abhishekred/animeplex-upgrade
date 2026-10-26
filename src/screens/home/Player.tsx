@@ -4429,7 +4429,20 @@ const Player = ({route}: Props): React.JSX.Element => {
             </Animated.View>
           </>
         )}
-    </SafeAreaView>
+    
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Watch Party"
+          onPress={() => setShowMetroserverWatchParty(true)}
+          style={{position: 'absolute', right: 18, bottom: 105, zIndex: 50, backgroundColor: primary, borderRadius: 22, paddingVertical: 10, paddingHorizontal: 14}}>
+          <Text style={{color: '#111', fontWeight: '800'}}>Watch Party</Text>
+        </Pressable>
+        <MetroserverWatchParty
+          visible={showMetroserverWatchParty}
+          onClose={() => setShowMetroserverWatchParty(false)}
+          mediaTitle={activeEpisode?.title || route.params?.title || 'AnimePlex'}
+        />
+</SafeAreaView>
   );
 };
 
