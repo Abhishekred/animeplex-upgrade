@@ -149,6 +149,7 @@ import {
   shouldAutoPlayNext,
 } from '../../lib/player/autoNext';
 import {useSleepTimer} from '../../lib/hooks/useSleepTimer';
+import MetroserverWatchParty from '../../components/watch-party/MetroserverWatchParty';
 import {useNextEpisodePrefetch} from '../../lib/hooks/useNextEpisodePrefetch';
 
 import {
@@ -759,6 +760,7 @@ const Player = ({route}: Props): React.JSX.Element => {
   const sidebarTranslateX = useSharedValue(400);
   const sidebarBackdropOpacity = useSharedValue(0);
 
+  const [showMetroserverWatchParty, setShowMetroserverWatchParty] = useState(false);
   const [showEpisodeSidebar, setShowEpisodeSidebar] = useState(false);
   const episodeListRef = useRef<FlatList>(null);
   const hasMultipleEpisodes = useMemo(
@@ -3373,7 +3375,20 @@ const Player = ({route}: Props): React.JSX.Element => {
               navigation.goBack();
             }}
           />
-        </SafeAreaView>
+        
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Watch Party"
+          onPress={() => setShowMetroserverWatchParty(true)}
+          style={{position: 'absolute', right: 18, bottom: 105, zIndex: 50, backgroundColor: primary, borderRadius: 22, paddingVertical: 10, paddingHorizontal: 14}}>
+          <Text style={{color: '#111', fontWeight: '800'}}>Watch Party</Text>
+        </Pressable>
+        <MetroserverWatchParty
+          visible={showMetroserverWatchParty}
+          onClose={() => setShowMetroserverWatchParty(false)}
+          mediaTitle={activeEpisode?.title || route.params?.title || 'AnimePlex'}
+        />
+</SafeAreaView>
         <View className="w-full max-w-md px-6 items-center">
           <MaterialIcons name="folder-open" size={44} color={primary} />
           <Text className="text-white text-xl font-bold mt-3 text-center">
