@@ -6,6 +6,7 @@ import {
   ProviderSource,
 } from '../storage/extensionStorage';
 import {mainStorage} from '../storage/StorageService';
+import useContentStore from '../zustand/contentStore';
 import {
   getSourceAuthHeaders,
   sourceTokenStorage,
@@ -58,6 +59,7 @@ export class ExtensionManager {
   private readonly legacyCustomProviderBaseUrlKey = 'customProviderBaseUrl';
 
   private testMode = false;
+  private autoInstallStarted = false;
   private baseUrlTestMode = '';
 
   private getManifest = (url: string) => {
@@ -524,8 +526,20 @@ export class ExtensionManager {
     try {
       this.migrateLegacyCustomProviderSource();
 
-      // Load providers from cache
-      const source = this.getActiveSource();
+      // AnimePlex provider repository is preconfigured for fresh installs.
+      let source = this.getActiveSource();
+      if (!source) {
+        const defaultSource = createProviderSource(
+          'https://github.com/sachinqzqz-web/vega-providers',
+        );
+        extensionStorage.addProviderSources(
+          defaultSource.author,
+          defaultSource.url,
+          defaultSource.manifestUrl,
+        );
+        extensionStorage.setDefaultProviderSource(defaultSource.author);
+        source = extensionStorage.getProviderSource();
+      }
       const installed = extensionStorage.getInstalledProviders();
       const available = source
         ? extensionStorage.getAvailableProviders(source.author)
@@ -547,8 +561,42 @@ export class ExtensionManager {
           console.warn('Failed to refresh manifest on startup:', error);
         }
       }
+
+      // Automatically install provider extensions on a clean install.
+      if (installed.length === 0 && !this.autoInstallStarted) {
+        this.autoInstallStarted = true;
+        void this.autoInstallDefaultProviders(source);
+      }
     } catch (error) {
       console.error('Failed to initialize extension system:', error);
+    }
+  }
+
+  private async autoInstallDefaultProviders(source: ProviderSource): Promise<void> {
+    try {
+      const providers = await this.fetchManifest(source, false);
+      // Sequential installation avoids overwhelming low-memory devices.
+      for (const provider of providers) {
+        try {
+          await this.installProvider(provider);
+        } catch (error) {
+          console.warn('Skipping provider that failed to install:', provider.value, error);
+        }
+      }
+
+      const latestInstalled = extensionStorage.getInstalledProviders();
+      if (latestInstalled.length > 0) {
+        const movieBox = latestInstalled.find(
+          provider =>
+            provider.value.toLowerCase() === 'movieboxweb' ||
+            provider.display_name.toLowerCase() === 'moviebox web',
+        );
+        useContentStore.getState().setInstalledProviders(latestInstalled);
+        useContentStore.getState().setProvider(movieBox || latestInstalled[0]);
+      }
+    } catch (error) {
+      console.warn('Automatic provider setup failed; users can retry from Provider Manager:', error);
+      this.autoInstallStarted = false;
     }
   }
 
