@@ -254,21 +254,10 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   }, [displayTitle, searchNavigation]);
 
   const handleOpenWeb = useCallback(() => {
-    if (!webUrl) {
-      return;
-    }
-    if (settingsStorage.isSkipInAppWebview()) {
-      if (!isSafeExternalUrl(webUrl)) {
-        ToastAndroid.show('Unsupported link', ToastAndroid.SHORT);
-        return;
-      }
-      Linking.openURL(webUrl).catch(() => {
-        ToastAndroid.show('Failed to open browser', ToastAndroid.SHORT);
-      });
-    } else {
-      navigation.navigate('Webview', {link: webUrl});
-    }
-  }, [navigation, webUrl]);
+    Linking.openURL('https://www.instagram.com/animeplexofficial?srtk=MTR3OWY4NjVqNGhheg==').catch(() => {
+      ToastAndroid.show('Unable to open Instagram', ToastAndroid.SHORT);
+    });
+  }, []);
 
   if (error && !info) {
     return (
