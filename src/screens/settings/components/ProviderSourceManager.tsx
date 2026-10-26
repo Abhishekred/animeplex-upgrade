@@ -24,6 +24,7 @@ import {AddSourceModal} from './AddSourceModal';
 import {SourcePickerModal} from './SourcePickerModal';
 
 const RAW_GITHUB_PREFIX = 'https://raw.githubusercontent.com/';
+const DEFAULT_PROVIDER_REPOSITORY = 'https://github.com/sachinqzqz-web/vega-providers';
 const INVALID_SOURCE_MESSAGE =
   'Enter a GitHub, Codeberg, Bitbucket or GitLab repo URL, an HTTP or HTTPS link to a manifest.json, or an author name such as author, author@cb, author@bb or author@gl.';
 
@@ -49,7 +50,7 @@ const ProviderSourceManager = ({
   const [showSourcePicker, setShowSourcePicker] = useState(false);
   const [invalidSourceMessage, setInvalidSourceMessage] = useState<string>();
   const [sourceToRemove, setSourceToRemove] = useState<string>();
-  const [prefillValue, setPrefillValue] = useState<string>();
+  const [prefillValue, setPrefillValue] = useState<string>(DEFAULT_PROVIDER_REPOSITORY);
   const [prefillToken, setPrefillToken] = useState<string>();
 
   const defaultSource = useMemo(() => {
@@ -61,6 +62,7 @@ const ProviderSourceManager = ({
     setSources(nextSources);
     if (nextSources.length === 0) {
       setShowSourcePicker(false);
+      setPrefillValue(DEFAULT_PROVIDER_REPOSITORY);
       setShowAddDialog(true);
     }
   };
@@ -74,6 +76,7 @@ const ProviderSourceManager = ({
     setSources(currentSources);
 
     if (currentSources.length === 0) {
+      setPrefillValue(DEFAULT_PROVIDER_REPOSITORY);
       // Opening a native modal while the stack screen is attaching can lose
       // its Fabric surface on TV. Wait for the navigation transition to finish.
       return scheduleWhenIdle(() => setShowAddDialog(true), 300, true);
