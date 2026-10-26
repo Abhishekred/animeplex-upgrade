@@ -526,20 +526,22 @@ export class ExtensionManager {
     try {
       this.migrateLegacyCustomProviderSource();
 
-      // AnimePlex provider repository is preconfigured for fresh installs.
-      let source = this.getActiveSource();
-      if (!source) {
-        const defaultSource = createProviderSource(
-          'https://github.com/sachinqzqz-web/vega-providers',
-        );
+      // Keep the AnimePlex provider repository available and make it the default source.
+      const defaultSource = createProviderSource(
+        'https://github.com/sachinqzqz-web/vega-providers',
+      );
+      const savedDefaultSource = extensionStorage
+        .getProviderSources()
+        .find(item => item.author === defaultSource.author);
+      if (!savedDefaultSource) {
         extensionStorage.addProviderSources(
           defaultSource.author,
           defaultSource.url,
           defaultSource.manifestUrl,
         );
-        extensionStorage.setDefaultProviderSource(defaultSource.author);
-        source = extensionStorage.getProviderSource();
       }
+      extensionStorage.setDefaultProviderSource(defaultSource.author);
+      const source = extensionStorage.getProviderSource();
       if (!source) return;
       const installed = extensionStorage.getInstalledProviders();
       const available = source
