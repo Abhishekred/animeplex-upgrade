@@ -105,6 +105,7 @@ import useDownloadsStore, {
 import {RemotePlayerScreen} from '../../components/remote-player';
 import {useRemoteStore} from '../../lib/remote/remoteStore';
 import {remotePlaybackManager} from '../../lib/remote/remotePlaybackManager';
+import {vegaCastService} from '../../lib/remote/vegaCastService';
 import {remoteDeliveryService} from '../../lib/remote/remoteDeliveryService';
 import {
   RemoteAudioTrack,
@@ -869,6 +870,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     setExternalSubs,
     isLoading: streamLoading,
     error: streamError,
+    refreshLinks,
     switchToNextStream,
   } = useStream({
     activeEpisode,
@@ -1524,6 +1526,7 @@ const Player = ({route}: Props): React.JSX.Element => {
   // Sync fixes for the current video. Each source can be off by a different
   // amount, so both reset when the stream changes.
   const [subtitleStyle, setSubtitleStyle] = useState(readSubtitleStyle);
+  const [bottomControlHeight, setBottomControlHeight] = useState(44);
   useFocusEffect(useCallback(() => {
     const nextStyle = readSubtitleStyle();
     setSubtitleStyle(previous =>
@@ -1880,6 +1883,11 @@ const Player = ({route}: Props): React.JSX.Element => {
   } | null>(null);
   const reloadStartMs =
     reloadStart?.stream === selectedStream ? reloadStart.ms : undefined;
+  // Stream whose links were last refreshed after its reload failed.
+  const linkRefreshRef = useRef<unknown>(null);
+  const pendingLinkRefreshRef = useRef<{stream: unknown; episodeKey: string} | null>(null);
+  const switchToNextStreamRef = useRef(switchToNextStream);
+  switchToNextStreamRef.current = switchToNextStream;
 
   const handleVideoError = useCallback(
     (e: any) => {
@@ -1910,6 +1918,12 @@ const Player = ({route}: Props): React.JSX.Element => {
       }
 
       const stream = selectedStreamRef.current;
+      // Native playback may report another error while extraction is pending.
+      // Let that request finish before deciding whether to switch or close.
+      if (pendingLinkRefreshRef.current?.stream === stream &&
+          pendingLinkRefreshRef.current.episodeKey === activeEpisodeKeyRef.current) {
+        return;
+      }
       if (!isTorrentStream(stream) && !isLocalPath(stream?.link)) {
         const {action, state} = decidePlaybackError(
           playbackRetryRef.current,
@@ -1931,6 +1945,43 @@ const Player = ({route}: Props): React.JSX.Element => {
           ToastAndroid.show('Connection lost, retrying', ToastAndroid.SHORT);
           return;
         }
+        // The reload failed too, so the link has likely expired. Ask the
+        // provider for new links once; the same server then continues from
+        // where it stopped.
+        if (state.retried && linkRefreshRef.current !== stream) {
+          linkRefreshRef.current = stream;
+          const episodeKey = activeEpisodeKeyRef.current;
+          const pending = {stream, episodeKey};
+          pendingLinkRefreshRef.current = pending;
+          ToastAndroid.show('Getting a new link', ToastAndroid.SHORT);
+          refreshLinks()
+            .catch(() => false)
+            .then(refreshed => {
+              if (
+                refreshed ||
+                activeEpisodeKeyRef.current !== episodeKey ||
+                selectedStreamRef.current !== stream ||
+                !navigation.isFocused()
+              ) {
+                return;
+              }
+              if (!switchToNextStreamRef.current()) {
+                ToastAndroid.show(
+                  'Video could not be played, try again later',
+                  ToastAndroid.SHORT,
+                );
+                navigation.goBack();
+              }
+            })
+            .finally(() => {
+              // An older request must not clear a new episode's pending guard.
+              if (pendingLinkRefreshRef.current === pending) {
+                pendingLinkRefreshRef.current = null;
+              }
+            });
+          setShowControls(true);
+          return;
+        }
       }
 
       if (!switchToNextStream()) {
@@ -1948,6 +1999,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       keepPosition,
       markStreamsOnline,
       navigation,
+      refreshLinks,
       route.params.localContent,
       setSelectedStream,
       setShowControls,
@@ -2348,7 +2400,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     // DLNA comes from the store; Cast comes from the live session, so switching
     // Cast devices reloads and the placeholder-then-real-id double load cannot happen.
     const targetDevice: RemoteDevice | null =
-      connectedRemoteDevice?.type === 'dlna'
+      (connectedRemoteDevice?.type === 'dlna' || connectedRemoteDevice?.type === 'vega-cast')
         ? connectedRemoteDevice
         : remoteMediaClient && castDevice
           ? {
@@ -2442,6 +2494,9 @@ const Player = ({route}: Props): React.JSX.Element => {
                 : undefined;
 
         await remotePlaybackManager.startRemotePlayback(targetDevice, {
+          servers:useRemoteStore.getState().servers,
+          serverId:selectedStream?.link,
+          providerStream:selectedStream||undefined,
           sourceUrl: processedStreamUrl,
           sourceType: selectedStream?.type,
           isLocal: Boolean(isLocalOrDownloadedStream),
@@ -3115,6 +3170,15 @@ const Player = ({route}: Props): React.JSX.Element => {
     },
     [setSelectedStream, activeEpisodeKey, clearLocalVideoAssociation],
   );
+  useEffect(()=>vegaCastService.setServerSelector((server,position)=>{
+    if(useRemoteStore.getState().connectedDevice?.type!=='vega-cast')throw new Error('Vega Cast is not connected');
+    const stream=streamData?.find((item:any)=>item.link===server.id||item.link===server.link);
+    if(!stream)throw new Error('This server is no longer available');
+    videoPositionRef.current={...videoPositionRef.current,position};hasProgressRef.current=true;
+    remoteCastPositionRef.current=position;
+    setSelectedStream(stream);appliedPersistedLocalVideoRef.current=true;
+    if(activeEpisodeKey)clearLocalVideoAssociation(activeEpisodeKey);
+  }),[streamData,setSelectedStream,activeEpisodeKey,clearLocalVideoAssociation,videoPositionRef,hasProgressRef]);
   const handleSelectMenuQuality = useCallback(
     (index: number) => {
       if (index === 1000) {
@@ -3179,9 +3243,8 @@ const Player = ({route}: Props): React.JSX.Element => {
       setControlLayout(layout);
       settingsStorage.setPlayerControlStyle(appearance);
       setControlStyle(appearance);
-      closeControlEditor();
     },
-    [closeControlEditor],
+    [],
   );
   const openToolbarTab = (
     tab: 'audio' | 'subtitle' | 'speed' | 'server' | 'sleep',
@@ -3353,6 +3416,16 @@ const Player = ({route}: Props): React.JSX.Element => {
     ).length *
       (48 * controlStyle.scale) +
     20 + hdrWidth;
+
+  const subtitleControlsVisible = showControls && !isCasting && !isPlayerLocked &&
+    !showSettings && !showEpisodeSidebar && !editingControls;
+  const playbackSubtitleStyle = {
+    ...subtitleStyle,
+    paddingBottom: subtitleControlsVisible
+      ? Math.max(subtitleStyle.paddingBottom, Math.ceil(10 + bottomControlHeight + 40 * controlStyle.scale))
+      : subtitleStyle.paddingBottom,
+  };
+
 
   // Ask for a local file before touching the network.
   if (localDecision === 'pending') {
@@ -3619,7 +3692,7 @@ const Player = ({route}: Props): React.JSX.Element => {
           onSkipPress={handleRemoteSkip}
         />
       ) : processedStreamUrl ? (
-        <VideoPlayer {...videoPlayerProps} nativeVideoViewRef={nativeVideoViewRef} headerStatus={torrentHeaderStatus} headerRightInset={toolbarHeaderInset} playbackSuspended={editingControls} controlScale={controlStyle.scale} seekbarScale={controlStyle.seekbarScale} ambientVideoSize={loadedVideoSize} ambientDisabled={isCasting} />
+        <VideoPlayer {...videoPlayerProps} controlAppearance={controlStyle} subtitleStyle={playbackSubtitleStyle} nativeVideoViewRef={nativeVideoViewRef} headerStatus={torrentHeaderStatus} headerRightInset={toolbarHeaderInset} playbackSuspended={editingControls} controlScale={controlStyle.scale} seekbarScale={controlStyle.seekbarScale} ambientVideoSize={loadedVideoSize} ambientDisabled={isCasting} />
       ) : (
         <View className="flex-1 justify-center items-center">
           <Animated.View style={[loadingContainerStyle]}>
@@ -3816,6 +3889,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       )}
       {!isCasting && !isPlayerLocked && !showSettings && !showEpisodeSidebar && !editingControls && (
         <NativeAnimated.View pointerEvents={showControls ? 'auto' : 'none'}
+          onLayout={event => setBottomControlHeight(event.nativeEvent.layout.height)}
           style={[controlsStyle, {left: '10%', right: '10%', bottom: 10}]} className="absolute">
           <PlayerControlBar ids={fittedControlLayout.bottom} controls={toolbarControls}
             onEdit={openControlEditor} appearance={controlStyle} getTVFocusProps={getTVFocusProps} />

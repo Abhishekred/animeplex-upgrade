@@ -1,5 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Platform, Switch, Text, View} from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {Host, Slider} from '@expo/ui/jetpack-compose';
 import {fillMaxWidth} from '@expo/ui/jetpack-compose/modifiers';
 import {useM3HostTheme} from '../theme/M3PaletteContext';
@@ -41,30 +42,33 @@ export function StyleSlider({
     );
     setPreview(draft.current);
   };
+  const adjust = (delta: number) => {
+    change(draft.current + delta);
+    onChange(draft.current);
+  };
+  const stepButton = (delta: number) => (
+    <TVFocusable registerScreenFocus={false} accessibilityRole="button"
+      accessibilityLabel={`${delta < 0 ? 'Decrease' : 'Increase'} ${label}`}
+      onPress={() => adjust(delta)} borderRadius={18} focusBorderColor={color}
+      style={{width: 36, height: 36, borderRadius: 18, backgroundColor: '#262626', alignItems: 'center', justifyContent: 'center'}}>
+      <MaterialCommunityIcons name={delta < 0 ? 'minus' : 'plus'} size={22}
+        color={(delta < 0 ? preview <= min : preview >= max) ? '#777777' : 'white'} />
+    </TVFocusable>
+  );
   return (
     <View style={{marginTop: 12}}>
       <Text style={{color: '#bbb', fontSize: 12}}>
         {label} · {format(preview)}
       </Text>
       {isTV ? (
-        <View style={{flexDirection: 'row', gap: 12, marginTop: 8}}>
-          {[-step, step].map(delta => (
-            <TVFocusable
-              key={delta}
-              registerScreenFocus={false}
-              accessibilityLabel={`${delta < 0 ? 'Decrease' : 'Increase'} ${label}`}
-              onPress={() => {
-                change(draft.current + delta);
-                onChange(draft.current);
-              }}
-              style={{
-                padding: 10,
-                backgroundColor: '#292929',
-                borderRadius: 16,
-              }}>
-              <Text style={{color: 'white'}}>{delta < 0 ? '−' : '+'}</Text>
-            </TVFocusable>
-          ))}
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4}}>
+          {stepButton(-step)}
+          <View accessibilityRole="progressbar" accessibilityLabel={label}
+            accessibilityValue={{min, max, now: preview, text: format(preview)}}
+            style={{flex: 1, height: 6, borderRadius: 3, backgroundColor: '#555555', overflow: 'hidden'}}>
+            <View style={{height: '100%', width: `${((preview - min) / (max - min)) * 100}%`, backgroundColor: color}} />
+          </View>
+          {stepButton(step)}
         </View>
       ) : (
         <Host
@@ -121,7 +125,7 @@ const PREVIEW: PlayerControl[] = [
 ];
 const percent = (n: number) => `${Math.round(n * 100)}%`;
 
-export default function PlayerControlStyleEditor({
+export function getPlayerControlStyleRows({
   value,
   color,
   onChange,
@@ -171,7 +175,7 @@ export default function PlayerControlStyleEditor({
       </View>
     </View>
   );
-  return (
+  const content = (
     <View>
       <View style={{padding: 10, backgroundColor: '#343a40', borderRadius: 12}}>
         <Text
@@ -258,6 +262,27 @@ export default function PlayerControlStyleEditor({
         color={color}
         onChange={backgroundOpacity => onChange({...value, backgroundOpacity})}
       />
+      <TVFocusable registerScreenFocus={false} accessibilityRole="switch"
+        accessibilityLabel="Title background"
+        accessibilityState={{checked: value.titleBackground}}
+        onPress={() => onChange({...value, titleBackground: !value.titleBackground})}
+        borderRadius={18}
+        style={{marginTop: 12, padding: 12, borderRadius: 18, backgroundColor: '#292929',
+          flexDirection: 'row', alignItems: 'center', gap: 12}}>
+        <View style={{flex: 1}}>
+          <Text style={{color: '#bbb', fontSize: 12}}>Title background</Text>
+          <Text style={{color: '#999', fontSize: 11, marginTop: 4}}>
+            Use the same rounded background as the control rows
+          </Text>
+        </View>
+        <Switch value={value.titleBackground} focusable={false}
+          pointerEvents={isTV ? 'none' : 'auto'}
+          importantForAccessibility={isTV ? 'no' : 'auto'} accessibilityElementsHidden={isTV}
+          accessibilityLabel="Title background"
+          onValueChange={isTV ? undefined : titleBackground => onChange({...value, titleBackground})}
+          thumbColor={value.titleBackground ? '#fff' : '#bbb'}
+          trackColor={{false: '#555', true: color}} />
+      </TVFocusable>
       <StyleSlider
         label="Seekbar height · track, knob and markers"
         value={value.seekbarScale}
@@ -280,4 +305,9 @@ export default function PlayerControlStyleEditor({
       />
     </View>
   );
+  return React.Children.toArray(content.props.children);
+}
+
+export default function PlayerControlStyleEditor(props: Parameters<typeof getPlayerControlStyleRows>[0]) {
+  return <View>{getPlayerControlStyleRows(props)}</View>;
 }

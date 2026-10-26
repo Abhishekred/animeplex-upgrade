@@ -41,6 +41,7 @@ describe('settings defaults', () => {
     expect(settingsStorage.isHapticFeedbackEnabled()).toBe(true);
     expect(settingsStorage.isNotificationsEnabled()).toBe(true);
     expect(settingsStorage.isAutoCheckUpdateEnabled()).toBe(true);
+    expect(settingsStorage.isProviderAutoUpdateEnabled()).toBe(true);
     expect(settingsStorage.showMediaControls()).toBe(true);
     expect(settingsStorage.showHamburgerMenu()).toBe(true);
     expect(settingsStorage.isSwipeGestureEnabled()).toBe(true);
@@ -57,6 +58,15 @@ describe('settings defaults', () => {
     expect(settingsStorage.hideSeekButtons()).toBe(false);
     expect(settingsStorage.isEnable2xGestureEnabled()).toBe(false);
     expect(settingsStorage.isSkipInAppWebview()).toBe(false);
+  });
+
+  it('persists provider auto-updates independently from app update preferences', () => {
+    settingsStorage.setProviderAutoUpdateEnabled(false);
+    expect(settingsStorage.isProviderAutoUpdateEnabled()).toBe(false);
+    expect(mockBooleanValues.get(SettingsKeys.AUTO_UPDATE_PROVIDERS)).toBe(false);
+    expect(settingsStorage.isAutoCheckUpdateEnabled()).toBe(true);
+    settingsStorage.setProviderAutoUpdateEnabled(true);
+    expect(settingsStorage.isProviderAutoUpdateEnabled()).toBe(true);
   });
 
   it('keeps "ask for local file first" strictly opt-in', () => {
@@ -85,7 +95,7 @@ describe('settings defaults', () => {
   });
 
   it('saves every allowed seek interval', () => {
-    for (const seconds of [5, 10, 15, 30, 60, 85]) {
+    for (let seconds = 5; seconds <= 90; seconds += 5) {
       settingsStorage.setSeekInterval(seconds);
       expect(settingsStorage.getSeekInterval()).toBe(seconds);
       expect(mockNumberValues.get(SettingsKeys.SEEK_INTERVAL)).toBe(seconds);
@@ -101,6 +111,20 @@ describe('settings defaults', () => {
       mockNumberValues.set(SettingsKeys.SEEK_INTERVAL, stored);
       expect(settingsStorage.getSeekInterval()).toBe(10);
     }
+  });
+
+  it('defaults the video fit to Fit and saves the picked mode', () => {
+    expect(settingsStorage.getDefaultResizeMode()).toBe('none');
+    for (const mode of ['cover', 'stretch', 'contain', 'none'] as const) {
+      settingsStorage.setDefaultResizeMode(mode);
+      expect(settingsStorage.getDefaultResizeMode()).toBe(mode);
+      expect(mockStringValues.get(SettingsKeys.DEFAULT_RESIZE_MODE)).toBe(mode);
+    }
+  });
+
+  it('falls back to Fit for an unknown saved video fit', () => {
+    mockStringValues.set(SettingsKeys.DEFAULT_RESIZE_MODE, 'zoom');
+    expect(settingsStorage.getDefaultResizeMode()).toBe('none');
   });
 
   it('defaults playback speed to 1x when nothing is saved', () => {
@@ -138,8 +162,8 @@ describe('settings defaults', () => {
 
   it('persists player styling, validates saved values, and defaults corrupt JSON', () => {
     const defaults = settingsStorage.getPlayerControlStyle();
-    expect(defaults).toEqual({labels: 'full', alignment: 'distributed', scale: 1, backgroundOpacity: 0, seekbarScale: 1});
-    const style = {...defaults, labels: 'hidden' as const, alignment: 'right' as const, scale: 1.2, backgroundOpacity: 0.4, seekbarScale: 1.5};
+    expect(defaults).toEqual({labels: 'full', alignment: 'distributed', scale: 1, backgroundOpacity: 0, titleBackground: false, seekbarScale: 1});
+    const style = {...defaults, titleBackground: true, labels: 'hidden' as const, alignment: 'right' as const, scale: 1.2, backgroundOpacity: 0.4, seekbarScale: 1.5};
     settingsStorage.setPlayerControlStyle(style);
     expect(settingsStorage.getPlayerControlStyle()).toEqual(style);
     mockStringValues.set(SettingsKeys.PLAYER_CONTROL_STYLE, JSON.stringify({labels: 'bad', alignment: 'bad', scale: 100, backgroundOpacity: -1, seekbarScale: 999}));

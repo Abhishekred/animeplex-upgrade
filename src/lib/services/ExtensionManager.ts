@@ -244,6 +244,7 @@ export class ExtensionManager {
     providerValue: string,
     version: string,
     path?: string,
+    cacheResult = true,
   ): Promise<ProviderModule> {
     if (this.testMode) {
       return this.downloadTestProviderModule(providerValue);
@@ -318,7 +319,7 @@ export class ExtensionManager {
       };
 
       // Cache the modules
-      extensionStorage.cacheProviderModules(providerModule);
+      if (cacheResult) extensionStorage.cacheProviderModules(providerModule);
 
       return providerModule;
     } catch (error) {
@@ -440,18 +441,19 @@ export class ExtensionManager {
   /**
    * Update a provider
    */
-  async updateProvider(provider: ProviderExtension): Promise<boolean> {
-    if (!extensionStorage.isProviderInstalled(provider.value, provider.source.author)) {
+  async updateProvider(provider: ProviderExtension, shouldApply: () => boolean = () => true): Promise<boolean> {
+    if (!shouldApply() || !extensionStorage.isProviderInstalled(provider.value, provider.source.author)) {
       return false;
     }
     try {
       // Download updated modules
-      await this.downloadProviderModules(
+      const downloaded = await this.downloadProviderModules(
         provider.source.url,
         provider.source.author,
         provider.value,
         provider.version,
         provider.path,
+        false,
       );
 
       // Uninstall or source removal during the download takes precedence.
@@ -459,6 +461,10 @@ export class ExtensionManager {
         extensionStorage.removeProviderModules(provider.value, provider.source.author);
         return false;
       }
+
+      // Recheck immediately before committing code and version together.
+      if (!shouldApply()) return false;
+      extensionStorage.cacheProviderModules(downloaded);
 
       // Update the existing installation record.
       extensionStorage.installProvider(provider);
