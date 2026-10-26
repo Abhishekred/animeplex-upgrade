@@ -184,13 +184,14 @@ const writeLauncherResources = resRoot => {
   fs.mkdirSync(drawableV26, {recursive: true});
   for (const variant of variants) {
     const id = variant.id.toLowerCase();
+    const tintAttributes = variant.id === 'White'
+      ? ''
+      : `\n    android:tint="${variant.color}"\n    android:tintMode="src_in"`;
     fs.writeFileSync(
       path.join(drawable, `ic_launcher_foreground_${id}.xml`),
       `<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
     android:gravity="center"
-    android:src="@mipmap/ic_launcher_foreground"
-    android:tint="${variant.color}"
-    android:tintMode="src_in" />\n`,
+    android:src="@mipmap/ic_launcher_foreground"${tintAttributes} />\n`,
     );
     fs.writeFileSync(
       path.join(drawableV26, `ic_launcher_${id}.xml`),
@@ -215,18 +216,17 @@ const copyTvBannerResources = (projectRoot, resRoot) => {
 };
 
 const copySplashResources = (projectRoot, resRoot) => {
-  const sourceRoot = path.join(projectRoot, 'assets', 'bootsplash', 'android');
+  // Always ship the AnimePlex artwork in the native splash resources. The
+  // previous pre-generated Vega logos were copied over these files on every
+  // prebuild, so changing app.config.js alone could never update the splash.
+  const logoPath = path.join(projectRoot, 'assets', 'aplogo.png');
   for (const density of ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
     const bucket = `drawable-${density}`;
-    const sourceDir = path.join(sourceRoot, bucket);
     const targetDir = path.join(resRoot, bucket);
     fs.mkdirSync(targetDir, {recursive: true});
     for (const variant of variants) {
       const filename = `bootsplash_logo_${variant.id.toLowerCase()}.png`;
-      fs.copyFileSync(
-        path.join(sourceDir, filename),
-        path.join(targetDir, filename),
-      );
+      fs.copyFileSync(logoPath, path.join(targetDir, filename));
     }
   }
 };
