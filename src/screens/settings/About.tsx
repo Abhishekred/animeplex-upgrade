@@ -101,52 +101,33 @@ export const checkForUpdate = async (
 ) => {
   setUpdateLoading(true);
   try {
-    // Prefer the release manifest managed by the AnimePlex Control Center.
-    // Fall back to the upstream release feed if the admin manifest is unavailable.
-    let data: any = null;
-    try {
-      const manifestResponse = await fetch(
-        'https://raw.githubusercontent.com/Abhishekred/Animeplex-Admin-panel/main/release.json',
-        {headers: {'Cache-Control': 'no-cache'}},
-      );
-      if (manifestResponse.ok) {
-        const manifest = await manifestResponse.json();
-        if (manifest?.version) {
-          const apkUrl = typeof manifest.apkUrl === 'string' ? manifest.apkUrl.trim() : '';
-          const apkName = apkUrl.split('/').pop()?.split('?')[0] || 'AnimePlex-update.apk';
-          data = {
-            tag_name: String(manifest.version).startsWith('v')
-              ? String(manifest.version)
-              : `v${manifest.version}`,
-            body: manifest.releaseNotes || manifest.title || 'AnimePlex update available.',
-            assets: apkUrl ? [{name: apkName, browser_download_url: apkUrl}] : [],
-            html_url: apkUrl || 'https://github.com/Abhishekred/Animeplex-Admin-panel',
-            forceUpdate: Boolean(manifest.forceUpdate),
-            minimumVersion: manifest.minimumVersion || '0.0.0',
-          };
-        }
-      }
-    } catch (error) {
-      console.warn('[update] AnimePlex admin manifest unavailable; checking upstream releases.', error);
+    // AnimePlex updates are managed exclusively from the Admin Panel manifest.
+    // Do not fall back to the upstream Vega release feed.
+    const manifestResponse = await fetch(
+      'https://raw.githubusercontent.com/Abhishekred/Animeplex-Admin-panel/main/release.json',
+      {headers: {'Cache-Control': 'no-cache'}},
+    );
+    if (!manifestResponse.ok) {
+      throw new Error(`AnimePlex Admin update manifest unavailable (HTTP ${manifestResponse.status})`);
     }
-
-    if (!data) {
-      const res = await fetch(
-        'https://api.github.com/repos/vega-org/vega-app/releases/latest',
-      );
-      if (res.status === 403 || res.status === 429) {
-        ToastAndroid.show(
-          'GitHub API rate limit exceeded. Please wait a few minutes before trying again.',
-          ToastAndroid.LONG,
-        );
-        setUpdateLoading(false);
-        return;
-      }
-      if (!res.ok) {
-        throw new Error(`GitHub release check failed with status ${res.status}`);
-      }
-      data = await res.json();
+    const manifest = await manifestResponse.json();
+    if (!manifest?.version) {
+      throw new Error('AnimePlex Admin has not published a valid release version');
     }
+    const apkUrl = typeof manifest.apkUrl === 'string' ? manifest.apkUrl.trim() : '';
+    const apkName = apkUrl.split('/').pop()?.split('?')[0] || 'AnimePlex-update.apk';
+    const data: any = {
+      tag_name: String(manifest.version).startsWith('v')
+        ? String(manifest.version)
+        : `v${manifest.version}`,
+      body: manifest.releaseNotes || manifest.title || 'AnimePlex update available.',
+      assets: apkUrl && apkUrl.toLowerCase().split('?')[0].endsWith('.apk')
+        ? [{name: apkName, browser_download_url: apkUrl}]
+        : [],
+      html_url: apkUrl || 'https://animeplex-admin-panel.vercel.app/',
+      forceUpdate: Boolean(manifest.forceUpdate),
+      minimumVersion: manifest.minimumVersion || '0.0.0',
+    };
     if (!data?.tag_name) {
       throw new Error('Invalid release data received from AnimePlex admin or GitHub');
     }
@@ -166,24 +147,20 @@ export const checkForUpdate = async (
             label: 'Update',
             variant: 'primary',
             onPress: () => {
-              const targetKeyword = isTV ? 'tv' : 'mobile';
-              const apkAsset =
-                data?.assets?.find(
-                  (asset: any) =>
-                    asset.name?.endsWith('.apk') &&
-                    asset.name?.toLowerCase().includes(targetKeyword),
-                ) ||
-                data?.assets?.find(
-                  (asset: any) =>
-                    asset.name?.endsWith('.apk') &&
-                    asset.name?.toLowerCase().includes('universal'),
-                ) ||
-                data?.assets?.find((asset: any) =>
-                  asset.name?.endsWith('.apk'),
+              const apkAsset = data?.assets?.find((asset: any) =>
+                asset.name?.toLowerCase().endsWith('.apk'),
+              );
+              if (autoDownload && apkAsset) {
+                return downloadUpdate(apkAsset.browser_download_url, apkAsset.name);
+              }
+              if (!apkAsset) {
+                ToastAndroid.show(
+                  'Update is published, but the Admin Panel APK URL is missing or invalid.',
+                  ToastAndroid.LONG,
                 );
-              return autoDownload && apkAsset
-                ? downloadUpdate(apkAsset.browser_download_url, apkAsset.name)
-                : Linking.openURL(data.html_url);
+                return Linking.openURL('https://animeplex-admin-panel.vercel.app/');
+              }
+              return Linking.openURL(apkAsset.browser_download_url);
             },
           },
         ],
@@ -339,7 +316,7 @@ const About = ({navigation}: any) => {
               />
               <SettingsSwitchRow
                 title="Check on startup"
-                description="Look for a new release when Vega opens"
+                description="Look for a new AnimePlex release when the app opens"
                 value={autoCheckUpdate}
                 onValueChange={next => {
                   setAutoCheckUpdate(next);
