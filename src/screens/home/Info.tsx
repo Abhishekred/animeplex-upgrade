@@ -373,7 +373,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                       : undefined
                   }
                   exploreRef={exploreRef}
-                  onOpenWeb={webUrl ? handleOpenWeb : undefined}
+                  onOpenWeb={handleOpenWeb}
                   onSearchTitle={searchTitle}
                   onToggleLibrary={toggleLibrary}
                   onToggleSynopsis={() => setReadMore(value => !value)}
