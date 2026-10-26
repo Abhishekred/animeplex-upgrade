@@ -279,10 +279,8 @@ const Home = ({}: Props) => {
     installedProviders.length === 0 ||
     !provider?.value
   ) {
-    return <ScrollView contentContainerStyle={{flexGrow: 1, paddingTop: isTV ? 12 : 32}}>
-      {showContinueWatching && <ContinueWatching localOnly />}
-      <View style={{flex: 1, minHeight: 400}}><Tutorial /></View>
-    </ScrollView>;
+    // Keep the launch screen clean while AnimePlex installs providers in the background.
+    return <View style={{flex: 1, backgroundColor: colors.background}} />;
   }
 
   return (
