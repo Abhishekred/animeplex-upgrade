@@ -540,6 +540,7 @@ export class ExtensionManager {
         extensionStorage.setDefaultProviderSource(defaultSource.author);
         source = extensionStorage.getProviderSource();
       }
+      if (!source) return;
       const installed = extensionStorage.getInstalledProviders();
       const available = source
         ? extensionStorage.getAvailableProviders(source.author)
