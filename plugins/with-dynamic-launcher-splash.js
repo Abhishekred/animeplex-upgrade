@@ -1,6 +1,7 @@
 const fs = require('fs');
 const {addVideoPlayerAlias} = require('./video-player-intents');
 const path = require('path');
+const {PNG} = require('pngjs');
 const {
   withAndroidManifest,
   withAndroidStyles,
@@ -220,13 +221,34 @@ const copySplashResources = (projectRoot, resRoot) => {
   // previous pre-generated Vega logos were copied over these files on every
   // prebuild, so changing app.config.js alone could never update the splash.
   const logoPath = path.join(projectRoot, 'assets', 'aplogo.png');
-  for (const density of ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
+  const source = PNG.sync.read(fs.readFileSync(logoPath));
+  const densitySizes = {
+    mdpi: 200,
+    hdpi: 300,
+    xhdpi: 400,
+    xxhdpi: 600,
+    xxxhdpi: 800,
+  };
+  for (const [density, size] of Object.entries(densitySizes)) {
     const bucket = `drawable-${density}`;
     const targetDir = path.join(resRoot, bucket);
     fs.mkdirSync(targetDir, {recursive: true});
+    const output = new PNG({width: size, height: size});
+    // Nearest-neighbour scaling keeps transparent logo pixels intact and
+    // avoids relying on external image tooling during Expo prebuild.
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const sx = Math.min(source.width - 1, Math.floor((x * source.width) / size));
+        const sy = Math.min(source.height - 1, Math.floor((y * source.height) / size));
+        const from = (sy * source.width + sx) * 4;
+        const to = (y * size + x) * 4;
+        source.data.copy(output.data, to, from, from + 4);
+      }
+    }
+    const rendered = PNG.sync.write(output);
     for (const variant of variants) {
       const filename = `bootsplash_logo_${variant.id.toLowerCase()}.png`;
-      fs.copyFileSync(logoPath, path.join(targetDir, filename));
+      fs.writeFileSync(path.join(targetDir, filename), rendered);
     }
   }
 };
