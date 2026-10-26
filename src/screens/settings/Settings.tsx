@@ -344,8 +344,8 @@ const Settings = ({navigation}: Props) => {
               </Animated.View>
             )}
 
-            {/* Content provider section */}
-            <AnimatedSection delay={100}>
+            {/* Provider selection and management are intentionally hidden in the branded build. */}
+            {false && <AnimatedSection delay={100}>
               <View className="mb-6">
                 <AppText
                   role="labelLarge"
@@ -397,7 +397,7 @@ const Settings = ({navigation}: Props) => {
                   onPress={() => navigation.navigate('Extensions')}
                 />
               </SettingsSection>
-            </AnimatedSection>
+            </AnimatedSection>}
 
             {/* Network Section */}
             <AnimatedSection delay={150}>
@@ -471,7 +471,7 @@ const Settings = ({navigation}: Props) => {
             <AnimatedSection delay={400}>
               <SettingsSection title="About">
                 <SettingsRow
-                  title="About Vega"
+                  title="About AnimePlex"
                   icon="information-outline"
                   onPress={() => navigation.navigate('About')}
                 />
