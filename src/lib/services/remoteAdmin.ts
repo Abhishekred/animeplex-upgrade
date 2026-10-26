@@ -66,14 +66,18 @@ export async function fetchRemoteAdminConfig(): Promise<RemoteAdminConfig | null
     if (!envelope?.config || typeof envelope.config !== 'object') {
       throw new Error('Invalid AnimePlex admin config response');
     }
-    currentConfig = envelope.config;
-    listeners.forEach(listener => {
-      try {
-        listener(currentConfig as RemoteAdminConfig);
-      } catch (error) {
-        console.warn('[AnimePlex Admin] Config listener failed:', error);
-      }
-    });
+    const nextConfig = envelope.config;
+    const changed = JSON.stringify(currentConfig) !== JSON.stringify(nextConfig);
+    currentConfig = nextConfig;
+    if (changed) {
+      listeners.forEach(listener => {
+        try {
+          listener(currentConfig as RemoteAdminConfig);
+        } catch (error) {
+          console.warn('[AnimePlex Admin] Config listener failed:', error);
+        }
+      });
+    }
     return currentConfig;
   } catch (error) {
     // The app must remain usable when the remote dashboard is offline.
