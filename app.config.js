@@ -138,14 +138,14 @@ module.exports = () => {
   ];
   return {
     expo: {
-      name: 'Vega',
+      name: 'AnimePlex',
       scheme: [APP_SCHEME, 'vega-cast'],
-      displayName: 'Vega',
+      displayName: 'AnimePlex',
       jsEngine: 'hermes',
       newArchEnabled: true,
       autolinking: {exclude: ['expo-splash-screen']},
       plugins,
-      slug: 'vega',
+      slug: 'animeplex',
       version: '5.3.0',
       userInterfaceStyle: 'dark',
       experiments: {
