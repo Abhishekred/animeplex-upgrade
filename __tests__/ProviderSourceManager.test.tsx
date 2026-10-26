@@ -4,8 +4,12 @@ import ProviderSourceManager from '../src/screens/settings/components/ProviderSo
 import {AddSourceModal} from '../src/screens/settings/components/AddSourceModal';
 import {TVFocusable} from '../src/components/tv';
 
+let mockSources = [{author: 'existing', isDefault: true}];
+let mockOpen: (() => void) | undefined;
+const mockCancel = jest.fn();
+jest.mock('../src/lib/performance/idleWork', () => ({scheduleWhenIdle: (run: () => void) => {mockOpen = run; return mockCancel;}}));
 jest.mock('../src/lib/storage/extensionStorage', () => ({extensionStorage: {
-  getProviderSources: () => [{author: 'existing', isDefault: true}],
+  getProviderSources: () => mockSources,
 }}));
 jest.mock('../src/lib/utils/helpers', () => ({createProviderSource: jest.fn()}));
 jest.mock('../src/lib/storage/sourceTokenStorage', () => ({normalizeSourceToken: jest.fn(), sourceTokenStorage: {}}));
@@ -31,4 +35,18 @@ it('creates a fresh add dialog for every TV plus activation', () => {
   open();
   expect(tree.root.findByType(AddSourceModal).props.visible).toBe(true);
   act(() => tree.unmount());
+});
+
+it('waits until after navigation to open the first source dialog on a clean install', () => {
+  mockSources = [];
+  let tree!: renderer.ReactTestRenderer;
+  act(() => { tree = renderer.create(<ProviderSourceManager visible primary="#fff" onSourceChanged={jest.fn()} />); });
+  expect(tree.root.findAllByType(AddSourceModal)).toHaveLength(0);
+  act(() => mockOpen!());
+  expect(tree.root.findByType(AddSourceModal).props.visible).toBe(true);
+  act(() => tree.root.findByType(AddSourceModal).props.onClose());
+  act(() => tree.root.findAllByType(TVFocusable).find(node => node.props.accessibilityLabel === 'Add provider source')!.props.onPress());
+  expect(tree.root.findByType(AddSourceModal).props.visible).toBe(true);
+  act(() => tree.unmount());
+  expect(mockCancel).toHaveBeenCalled();
 });
