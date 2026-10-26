@@ -2745,8 +2745,11 @@ const Player = ({route}: Props): React.JSX.Element => {
           language.startsWith('hi-') ||
           title.includes('hindi');
       });
-      const audioTrackIndex = savedAudioTrack
+      const savedTrackIndex = savedAudioTrack && savedAudioTrack !== 'auto'
         ? audioTracks.findIndex(track => track.language === savedAudioTrack)
+        : -1;
+      const audioTrackIndex = savedTrackIndex !== -1
+        ? savedTrackIndex
         : hindiTrackIndex !== -1
           ? hindiTrackIndex
           : audioTracks.findIndex(track => track.language === 'auto');
