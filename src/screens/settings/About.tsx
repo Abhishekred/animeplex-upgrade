@@ -101,23 +101,54 @@ export const checkForUpdate = async (
 ) => {
   setUpdateLoading(true);
   try {
-    const res = await fetch(
-      'https://api.github.com/repos/vega-org/vega-app/releases/latest',
-    );
-    if (res.status === 403 || res.status === 429) {
-      ToastAndroid.show(
-        'GitHub API rate limit exceeded. Please wait a few minutes before trying again.',
-        ToastAndroid.LONG,
+    // Prefer the release manifest managed by the AnimePlex Control Center.
+    // Fall back to the upstream release feed if the admin manifest is unavailable.
+    let data: any = null;
+    try {
+      const manifestResponse = await fetch(
+        'https://raw.githubusercontent.com/Abhishekred/Animeplex-Admin-panel/main/release.json',
+        {headers: {'Cache-Control': 'no-cache'}},
       );
-      setUpdateLoading(false);
-      return;
+      if (manifestResponse.ok) {
+        const manifest = await manifestResponse.json();
+        if (manifest?.version) {
+          const apkUrl = typeof manifest.apkUrl === 'string' ? manifest.apkUrl.trim() : '';
+          const apkName = apkUrl.split('/').pop()?.split('?')[0] || 'AnimePlex-update.apk';
+          data = {
+            tag_name: String(manifest.version).startsWith('v')
+              ? String(manifest.version)
+              : `v${manifest.version}`,
+            body: manifest.releaseNotes || manifest.title || 'AnimePlex update available.',
+            assets: apkUrl ? [{name: apkName, browser_download_url: apkUrl}] : [],
+            html_url: apkUrl || 'https://github.com/Abhishekred/Animeplex-Admin-panel',
+            forceUpdate: Boolean(manifest.forceUpdate),
+            minimumVersion: manifest.minimumVersion || '0.0.0',
+          };
+        }
+      }
+    } catch (error) {
+      console.warn('[update] AnimePlex admin manifest unavailable; checking upstream releases.', error);
     }
-    if (!res.ok) {
-      throw new Error(`GitHub release check failed with status ${res.status}`);
+
+    if (!data) {
+      const res = await fetch(
+        'https://api.github.com/repos/vega-org/vega-app/releases/latest',
+      );
+      if (res.status === 403 || res.status === 429) {
+        ToastAndroid.show(
+          'GitHub API rate limit exceeded. Please wait a few minutes before trying again.',
+          ToastAndroid.LONG,
+        );
+        setUpdateLoading(false);
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(`GitHub release check failed with status ${res.status}`);
+      }
+      data = await res.json();
     }
-    const data = await res.json();
     if (!data?.tag_name) {
-      throw new Error('Invalid release data received from GitHub');
+      throw new Error('Invalid release data received from AnimePlex admin or GitHub');
     }
     const localVersion = Application.nativeApplicationVersion;
     const remoteVersion = Number(
