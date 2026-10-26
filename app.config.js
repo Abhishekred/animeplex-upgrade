@@ -148,6 +148,7 @@ module.exports = () => {
       slug: 'animeplex',
       version: '5.3.0',
       userInterfaceStyle: 'dark',
+      icon: './assets/aplogo.png',
       experiments: {
         reactCompiler: true,
       },
@@ -188,7 +189,7 @@ module.exports = () => {
         ],
         allowBackup: true,
         adaptiveIcon: {
-          foregroundImage: './assets/adaptive_icon.png',
+          foregroundImage: './assets/aplogo.png',
           backgroundColor: '#000000',
         },
         launchMode: 'singleTask',
