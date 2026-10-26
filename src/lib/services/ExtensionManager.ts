@@ -203,9 +203,9 @@ export class ExtensionManager {
             item.path === '' ||
             isValidProviderPath(item.path),
         )
-        .map((item: any) => ({
+        .map((item: any, index: number) => ({
           value: item.value,
-          display_name: item.display_name,
+          display_name: `AnimePlex server ${index + 1}`,
           disabled: item.disabled || false,
           source: {author: activeSource.author, url: activeSource.url},
           version: item.version,
