@@ -52,6 +52,7 @@ import Extensions from './screens/settings/Extensions';
 import Constants from 'expo-constants';
 import {settingsStorage} from './lib/storage';
 import {syncParallelStreaming} from './lib/parallelStreaming';
+import {startRemoteAdminSync} from './lib/services/remoteAdmin';
 import {updateProvidersService} from './lib/services/UpdateProviders';
 import {QueryClientProvider} from '@tanstack/react-query';
 import {queryClient} from './lib/client';
@@ -524,6 +525,9 @@ function TabStack() {
 }
 
 const App = () => {
+  // Connect to the AnimePlex Control Center. Remote config is optional; the app remains usable offline.
+  useEffect(() => startRemoteAdminSync(), []);
+
   useEffect(()=>{
     void Linking.getInitialURL().then(url=>{if(url)vegaCastService.handleInvitation(url);});
     const subscription=Linking.addEventListener('url',event=>{vegaCastService.handleInvitation(event.url);});
