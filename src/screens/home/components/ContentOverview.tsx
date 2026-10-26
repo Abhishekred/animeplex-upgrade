@@ -346,7 +346,7 @@ const ContentOverview = ({
             <AppText
               role="titleLargeEmphasized"
               style={{color: colors.onBackground, marginRight: 12}}>
-              AnimePlex server
+              Synopsis
             </AppText>
             <AppText
               role="labelLargeEmphasized"
