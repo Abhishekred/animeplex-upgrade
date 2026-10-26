@@ -63,9 +63,12 @@ jobs:
           chmod +x android/gradlew
 
       - name: Build release APK
+        env:
+          # APK packaging exceeded the default Gradle JVM heap in CI.
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx5g\ -XX:MaxMetaspaceSize=1g\ -Dfile.encoding=UTF-8
         run: |
           cd android
-          ./gradlew --no-daemon assembleRelease --stacktrace
+          ./gradlew --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8' assembleRelease --stacktrace
 
       - name: Check APK output
         shell: bash
