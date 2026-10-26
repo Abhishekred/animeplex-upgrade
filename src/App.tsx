@@ -38,7 +38,7 @@ import PlayerSettings from './screens/settings/PlayerSettings';
 import PlayerControlSettings from './screens/settings/PlayerControlSettings';
 import Appearance from './screens/settings/Appearance';
 import {M3ThemeProvider} from './theme/M3ThemeProvider';
-import {AppState, Linking, LogBox, useWindowDimensions} from 'react-native';
+import {Alert, AppState, Linking, LogBox, useWindowDimensions} from 'react-native';
 import {vegaCastService} from './lib/remote/vegaCastService';
 import {EpisodeLink, Stream} from './lib/providers/types';
 import {
@@ -52,7 +52,7 @@ import Extensions from './screens/settings/Extensions';
 import Constants from 'expo-constants';
 import {settingsStorage} from './lib/storage';
 import {syncParallelStreaming} from './lib/parallelStreaming';
-import {startRemoteAdminSync} from './lib/services/remoteAdmin';
+import {startRemoteAdminSync, subscribeRemoteAdminConfig} from './lib/services/remoteAdmin';
 import {updateProvidersService} from './lib/services/UpdateProviders';
 import {QueryClientProvider} from '@tanstack/react-query';
 import {queryClient} from './lib/client';
@@ -526,7 +526,31 @@ function TabStack() {
 
 const App = () => {
   // Connect to the AnimePlex Control Center. Remote config is optional; the app remains usable offline.
-  useEffect(() => startRemoteAdminSync(), []);
+  useEffect(() => {
+    const unsubscribe = subscribeRemoteAdminConfig(config => {
+      const general = config.general;
+      if (general?.maintenanceMode) {
+        Alert.alert(
+          'AnimePlex maintenance',
+          general.announcementMessage ||
+            'AnimePlex is under maintenance. Some features may be temporarily unavailable.',
+        );
+        return;
+      }
+      if (general?.announcementEnabled) {
+        const title = general.announcementTitle?.trim();
+        const message = general.announcementMessage?.trim();
+        if (title || message) {
+          Alert.alert(title || 'AnimePlex announcement', message || '');
+        }
+      }
+    });
+    const stop = startRemoteAdminSync();
+    return () => {
+      unsubscribe();
+      stop();
+    };
+  }, []);
 
   useEffect(()=>{
     void Linking.getInitialURL().then(url=>{if(url)vegaCastService.handleInvitation(url);});
