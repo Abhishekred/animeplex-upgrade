@@ -2748,10 +2748,12 @@ const Player = ({route}: Props): React.JSX.Element => {
       const savedTrackIndex = savedAudioTrack && savedAudioTrack !== 'auto'
         ? audioTracks.findIndex(track => track.language === savedAudioTrack)
         : -1;
-      const audioTrackIndex = savedTrackIndex !== -1
-        ? savedTrackIndex
-        : hindiTrackIndex !== -1
-          ? hindiTrackIndex
+      // Hindi is the app's default whenever a Hindi dub exists. A previously
+      // saved Original/English choice must not override that default.
+      const audioTrackIndex = hindiTrackIndex !== -1
+        ? hindiTrackIndex
+        : savedTrackIndex !== -1
+          ? savedTrackIndex
           : audioTracks.findIndex(track => track.language === 'auto');
       if (audioTrackIndex !== -1) {
         setSelectedAudioTrack({
