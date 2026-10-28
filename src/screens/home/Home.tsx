@@ -98,7 +98,7 @@ const Home = ({}: Props) => {
       setHomeShortcuts(
         validItems.length > 0
           ? validItems
-          : movieBoxIsDefault && !Array.isArray(config.homeShortcuts)
+          : movieBoxIsDefault && (!Array.isArray(config.homeShortcuts) || config.homeShortcuts.length === 0)
             ? [{id: 'default-moviebox-shortcut', label: 'Movie', providerValue: 'MovieBox', enabled: true}]
             : [],
       );
