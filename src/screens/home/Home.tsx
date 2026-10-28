@@ -341,6 +341,7 @@ const Home = ({}: Props) => {
             <StatusBar style="light" />
 
             <FlashList
+              key={`home-${hamburgerMenuEnabled}-${homeShortcuts.map(item => `${item.id}:${item.label}:${item.providerValue}`).join("|")}`}
               data={staged.rows}
               extraData={{homeShortcuts, hamburgerMenuEnabled}}
               onViewableItemsChanged={staged.onViewableItemsChanged}
@@ -389,7 +390,7 @@ const Home = ({}: Props) => {
                           onPress={() => openShortcutProvider(shortcut.providerValue)}
                           style={({pressed}) => ({
                             flexShrink: 0,
-                            backgroundColor: pressed ? '#e50914' : '#e5e5e5',
+                            backgroundColor: pressed ? '#d9d9d9' : '#ffffff',
                             paddingVertical: 10,
                             paddingHorizontal: 20,
                             borderRadius: 30,
