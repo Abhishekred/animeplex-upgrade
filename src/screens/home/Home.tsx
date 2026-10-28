@@ -81,7 +81,27 @@ const Home = ({}: Props) => {
     const applyConfig = (config: RemoteAdminConfig) => {
       setHamburgerMenuEnabled(config.features?.hamburgerMenu === true);
       const items = Array.isArray(config.homeShortcuts) ? config.homeShortcuts : [];
-      setHomeShortcuts(items.filter(item => item && item.enabled !== false && item.label?.trim() && item.providerValue?.trim()));
+      const validItems = items.filter(item =>
+        item &&
+        item.enabled !== false &&
+        typeof item.label === 'string' &&
+        item.label.trim().length > 0 &&
+        typeof item.providerValue === 'string' &&
+        item.providerValue.trim().length > 0,
+      );
+      // Safety fallback for the currently configured MovieBox default: older or
+      // partially published admin configs may omit homeShortcuts even when the
+      // default provider is enabled. Explicitly disabled shortcuts stay disabled.
+      const movieBoxIsDefault =
+        config.providers?.defaultProvider === 'MovieBox' &&
+        config.features?.hamburgerMenu === true;
+      setHomeShortcuts(
+        validItems.length > 0
+          ? validItems
+          : movieBoxIsDefault && !Array.isArray(config.homeShortcuts)
+            ? [{id: 'default-moviebox-shortcut', label: 'Movie', providerValue: 'MovieBox', enabled: true}]
+            : [],
+      );
     };
     const unsubscribe = subscribeRemoteAdminConfig(applyConfig);
     // Refresh immediately and keep admin changes in sync while Home is mounted.
