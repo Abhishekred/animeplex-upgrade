@@ -75,9 +75,11 @@ const Home = ({}: Props) => {
     state => state.showContinueWatching,
   );
   const [homeShortcuts, setHomeShortcuts] = useState<NonNullable<RemoteAdminConfig['homeShortcuts']>>([]);
+  const [hamburgerMenuEnabled, setHamburgerMenuEnabled] = useState(false);
 
   useEffect(() => {
     const applyConfig = (config: RemoteAdminConfig) => {
+      setHamburgerMenuEnabled(config.features?.hamburgerMenu === true);
       const items = Array.isArray(config.homeShortcuts) ? config.homeShortcuts : [];
       setHomeShortcuts(items.filter(item => item && item.enabled !== false && item.label?.trim() && item.providerValue?.trim()));
     };
@@ -325,10 +327,10 @@ const Home = ({}: Props) => {
             drawerPosition="left"
             drawerType="front"
             drawerStyle={{width: 200, backgroundColor: 'transparent'}}
-            swipeEdgeWidth={disableDrawer ? 0 : 70}
-            swipeEnabled={!disableDrawer && !isTV}
+            swipeEdgeWidth={disableDrawer || !hamburgerMenuEnabled ? 0 : 70}
+            swipeEnabled={!disableDrawer && hamburgerMenuEnabled && !isTV}
             renderDrawerContent={() =>
-              !disableDrawer && !isTV ? (
+              !disableDrawer && hamburgerMenuEnabled && !isTV ? (
                 <ProviderDrawer
                   isOpen={isDrawerOpen}
                   onSelectProvider={selectProvider}
@@ -371,6 +373,7 @@ const Home = ({}: Props) => {
                     isDrawerOpen={isTV ? isDrawerOpen : drawerSceneActive}
                     isVisible={heroVisible}
                     onOpenDrawer={openDrawer}
+                    showHamburger={hamburgerMenuEnabled}
                   />
                   {homeShortcuts.length > 0 && (
                     <ScrollView
@@ -410,7 +413,7 @@ const Home = ({}: Props) => {
             />
           </Drawer>
 
-          {isTV && isDrawerOpen ? (
+          {isTV && hamburgerMenuEnabled && isDrawerOpen ? (
             <Modal
               transparent
               visible={isDrawerOpen}
