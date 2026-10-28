@@ -16,6 +16,7 @@ export type RemoteAdminConfig = {
   };
   features?: Record<string, boolean | number | string>;
   content?: Record<string, boolean>;
+  homeShortcuts?: Array<{id: string; label: string; providerValue: string; enabled: boolean}>;
   providers?: Record<string, unknown>;
   playback?: Record<string, unknown>;
   notifications?: Record<string, boolean>;
