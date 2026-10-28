@@ -58,8 +58,6 @@ interface HeroProps {
   isVisible?: boolean;
   onOpenDrawer: () => void;
   showHamburger?: boolean;
-  homeShortcuts?: Array<{id: string; label: string; providerValue: string}>;
-  onShortcutPress?: (providerValue: string) => void;
 }
 
 const IMAGE_COLOR_FALLBACK = '#FFFFFF';
@@ -199,7 +197,7 @@ const HeroTopButton = React.forwardRef<
 );
 
 const Hero = memo(
-  ({isDrawerOpen, isVisible = true, onOpenDrawer, showHamburger = true, homeShortcuts = [], onShortcutPress}: HeroProps) => {
+  ({isDrawerOpen, isVisible = true, onOpenDrawer, showHamburger = true}: HeroProps) => {
     const colors = useM3Colors();
     const insets = useSafeAreaInsets();
     const [logoFailed, setLogoFailed] = useState(false);
@@ -657,39 +655,6 @@ const Hero = memo(
                     }}>
                     {heroData?.title || hero?.title}
                   </AppText>
-                ) : null}
-
-                {homeShortcuts.length > 0 && onShortcutPress ? (
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      flexWrap: 'wrap',
-                      gap: 8,
-                      justifyContent: 'center',
-                      marginTop: posterLike ? 6 : 10,
-                      maxWidth: '100%',
-                    }}>
-                    {homeShortcuts.map(shortcut => (
-                      <Pressable
-                        key={shortcut.id}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Switch provider to ${shortcut.label}`}
-                        onPress={() => onShortcutPress(shortcut.providerValue)}
-                        style={({pressed}) => ({
-                          backgroundColor: pressed ? '#D9D9D9' : '#FFFFFF',
-                          borderRadius: 24,
-                          minHeight: 38,
-                          justifyContent: 'center',
-                          paddingHorizontal: 18,
-                          paddingVertical: 8,
-                          opacity: pressed ? 0.82 : 1,
-                        })}>
-                        <AppText style={{color: '#000000', fontSize: 14, fontWeight: '700'}}>
-                          {shortcut.label.trim()}
-                        </AppText>
-                      </Pressable>
-                    ))}
-                  </View>
                 ) : null}
 
                 {genres.length > 0 ? (
