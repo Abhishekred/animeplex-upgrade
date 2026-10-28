@@ -57,6 +57,7 @@ interface HeroProps {
   isDrawerOpen: boolean;
   isVisible?: boolean;
   onOpenDrawer: () => void;
+  showHamburger?: boolean;
 }
 
 const IMAGE_COLOR_FALLBACK = '#FFFFFF';
@@ -196,7 +197,7 @@ const HeroTopButton = React.forwardRef<
 );
 
 const Hero = memo(
-  ({isDrawerOpen, isVisible = true, onOpenDrawer}: HeroProps) => {
+  ({isDrawerOpen, isVisible = true, onOpenDrawer, showHamburger = true}: HeroProps) => {
     const colors = useM3Colors();
     const insets = useSafeAreaInsets();
     const [logoFailed, setLogoFailed] = useState(false);
@@ -582,19 +583,21 @@ const Hero = memo(
               top: insets.top + (isTV ? 16 : 6),
               zIndex: 30,
             }}>
-            <HeroTopButton
-              ref={hamburgerRef}
-              onLayout={updateHamburgerNode}
-              icon="menu"
-              iconColor={searchButtonColor}
-              label="Open provider drawer"
-              disabled={isDrawerOpen}
-              hasTVPreferredFocus={isTV && !isDrawerOpen}
-              nextFocusRight={searchNode ?? undefined}
-              nextFocusDown={watchNowNode ?? undefined}
-              nextFocusUp={hamburgerNode ?? undefined}
-              onPress={onOpenDrawer}
-            />
+            {showHamburger ? (
+              <HeroTopButton
+                ref={hamburgerRef}
+                onLayout={updateHamburgerNode}
+                icon="menu"
+                iconColor={searchButtonColor}
+                label="Open provider drawer"
+                disabled={isDrawerOpen}
+                hasTVPreferredFocus={isTV && !isDrawerOpen}
+                nextFocusRight={searchNode ?? undefined}
+                nextFocusDown={watchNowNode ?? undefined}
+                nextFocusUp={hamburgerNode ?? undefined}
+                onPress={onOpenDrawer}
+              />
+            ) : null}
             <HeroTopButton
               ref={searchRef}
               onLayout={updateSearchNode}
