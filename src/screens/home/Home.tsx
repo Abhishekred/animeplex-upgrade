@@ -35,6 +35,7 @@ import ContinueWatching from '../../components/ContinueWatching';
 import StatusBarScrim from '../../components/ui/StatusBarScrim';
 import {isTV} from '../../lib/tv/constants';
 import useNavigationPreferencesStore from '../../lib/zustand/navigationPreferencesStore';
+import {fetchRemoteAdminConfig, subscribeRemoteAdminConfig, type RemoteAdminConfig} from '../../lib/services/remoteAdmin';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Home'>;
 
@@ -73,6 +74,17 @@ const Home = ({}: Props) => {
   const showContinueWatching = useNavigationPreferencesStore(
     state => state.showContinueWatching,
   );
+  const [homeShortcuts, setHomeShortcuts] = useState<NonNullable<RemoteAdminConfig['homeShortcuts']>>([]);
+
+  useEffect(() => {
+    const applyConfig = (config: RemoteAdminConfig) => {
+      const items = Array.isArray(config.homeShortcuts) ? config.homeShortcuts : [];
+      setHomeShortcuts(items.filter(item => item && item.enabled !== false && item.label?.trim() && item.providerValue?.trim()));
+    };
+    const unsubscribe = subscribeRemoteAdminConfig(applyConfig);
+    void fetchRemoteAdminConfig().then(config => { if (config) applyConfig(config); });
+    return unsubscribe;
+  }, []);
 
   // Memoize static values
   const disableDrawer = useMemo(
@@ -243,6 +255,19 @@ const Home = ({}: Props) => {
     setIsDrawerOpen(true);
   }, []);
   const closeDrawer = useCallback(() => setIsDrawerOpen(false), []);
+  const openShortcutProvider = useCallback((providerValue: string) => {
+    const wanted = providerValue.trim().toLocaleLowerCase();
+    const target = useContentStore.getState().installedProviders.find(item =>
+      item.value.trim().toLocaleLowerCase() === wanted ||
+      item.display_name.trim().toLocaleLowerCase() === wanted,
+    );
+    if (target) {
+      useContentStore.getState().setProvider(target);
+      return;
+    }
+    // Let the user install/select a provider if the admin configured one that is not installed yet.
+    openDrawer();
+  }, [openDrawer]);
   const acknowledgeNativeClose = useCallback(() => {
     // The library already animates overlay/gesture closes on the UI thread.
     // Commit controlled state in finishDrawerTransition, after that slide.
@@ -347,6 +372,32 @@ const Home = ({}: Props) => {
                     isVisible={heroVisible}
                     onOpenDrawer={openDrawer}
                   />
+                  {homeShortcuts.length > 0 && (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{paddingHorizontal: 10, paddingVertical: 6, gap: 10}}>
+                      {homeShortcuts.map(shortcut => (
+                        <Pressable
+                          key={shortcut.id}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Switch provider to ${shortcut.label}`}
+                          onPress={() => openShortcutProvider(shortcut.providerValue)}
+                          style={({pressed}) => ({
+                            flexShrink: 0,
+                            backgroundColor: pressed ? '#e50914' : '#e5e5e5',
+                            paddingVertical: 10,
+                            paddingHorizontal: 20,
+                            borderRadius: 30,
+                            opacity: pressed ? 0.88 : 1,
+                          })}>
+                          <AppText style={{color: '#000000', fontSize: 14, fontWeight: '700'}}>
+                            {shortcut.label}
+                          </AppText>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  )}
                   {showContinueWatching && <ContinueWatching />}
                 </>
               }
