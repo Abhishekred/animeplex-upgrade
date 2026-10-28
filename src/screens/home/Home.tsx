@@ -342,6 +342,7 @@ const Home = ({}: Props) => {
 
             <FlashList
               data={staged.rows}
+              extraData={{homeShortcuts, hamburgerMenuEnabled}}
               onViewableItemsChanged={staged.onViewableItemsChanged}
               renderItem={renderRow}
               keyExtractor={homeRowKey}
