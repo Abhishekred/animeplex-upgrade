@@ -35,7 +35,7 @@ import ContinueWatching from '../../components/ContinueWatching';
 import StatusBarScrim from '../../components/ui/StatusBarScrim';
 import {isTV} from '../../lib/tv/constants';
 import useNavigationPreferencesStore from '../../lib/zustand/navigationPreferencesStore';
-import {fetchRemoteAdminConfig, subscribeRemoteAdminConfig, type RemoteAdminConfig} from '../../lib/services/remoteAdmin';
+import {fetchRemoteAdminConfig, startRemoteAdminSync, subscribeRemoteAdminConfig, type RemoteAdminConfig} from '../../lib/services/remoteAdmin';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Home'>;
 
@@ -84,8 +84,14 @@ const Home = ({}: Props) => {
       setHomeShortcuts(items.filter(item => item && item.enabled !== false && item.label?.trim() && item.providerValue?.trim()));
     };
     const unsubscribe = subscribeRemoteAdminConfig(applyConfig);
+    // Refresh immediately and keep admin changes in sync while Home is mounted.
+    // This also recovers when the first request races the app/network startup.
+    const stopSync = startRemoteAdminSync(15_000);
     void fetchRemoteAdminConfig().then(config => { if (config) applyConfig(config); });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      stopSync();
+    };
   }, []);
 
   // Memoize static values
