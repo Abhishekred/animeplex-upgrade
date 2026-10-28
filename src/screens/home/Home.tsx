@@ -404,30 +404,47 @@ const Home = ({}: Props) => {
                     showHamburger={hamburgerMenuEnabled}
                   />
                   {homeShortcuts.length > 0 && (
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{paddingHorizontal: 10, paddingVertical: 6, gap: 10}}>
-                      {homeShortcuts.map(shortcut => (
-                        <Pressable
-                          key={shortcut.id}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Switch provider to ${shortcut.label}`}
-                          onPress={() => openShortcutProvider(shortcut.providerValue)}
-                          style={({pressed}) => ({
-                            flexShrink: 0,
-                            backgroundColor: pressed ? '#d9d9d9' : '#ffffff',
-                            paddingVertical: 10,
-                            paddingHorizontal: 20,
-                            borderRadius: 30,
-                            opacity: pressed ? 0.88 : 1,
-                          })}>
-                          <AppText style={{color: '#000000', fontSize: 14, fontWeight: '700'}}>
-                            {shortcut.label}
-                          </AppText>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
+                    <View
+                      style={{
+                        width: '100%',
+                        minHeight: 48,
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: '#000000',
+                        zIndex: 10,
+                        elevation: 2,
+                      }}>
+                      <ScrollView
+                        horizontal
+                        style={{flexGrow: 0, flexShrink: 1, width: '100%'}}
+                        contentContainerStyle={{alignItems: 'center', gap: 10}}
+                        showsHorizontalScrollIndicator={false}>
+                        {homeShortcuts.map(shortcut => (
+                          <Pressable
+                            key={shortcut.id}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Switch provider to ${shortcut.label}`}
+                            onPress={() => openShortcutProvider(shortcut.providerValue)}
+                            style={({pressed}) => ({
+                              flexShrink: 0,
+                              minHeight: 38,
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              backgroundColor: pressed ? '#d9d9d9' : '#ffffff',
+                              paddingVertical: 9,
+                              paddingHorizontal: 20,
+                              borderRadius: 30,
+                              opacity: pressed ? 0.88 : 1,
+                            })}>
+                            <AppText style={{color: '#000000', fontSize: 14, fontWeight: '700'}}>
+                              {shortcut.label.trim()}
+                            </AppText>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
                   )}
                   {showContinueWatching && <ContinueWatching />}
                 </>
