@@ -5,7 +5,7 @@ import {
   beginUIInteraction,
   endUIInteraction,
 } from '../../lib/performance/idleWork';
-import {RefreshControl, ScrollView, View, Modal, Pressable} from 'react-native';
+import {Alert, RefreshControl, ScrollView, View, Modal, Pressable} from 'react-native';
 import {FlashList} from '@shopify/flash-list';
 import Slider from '../../components/Slider';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
@@ -35,7 +35,7 @@ import ContinueWatching from '../../components/ContinueWatching';
 import StatusBarScrim from '../../components/ui/StatusBarScrim';
 import {isTV} from '../../lib/tv/constants';
 import useNavigationPreferencesStore from '../../lib/zustand/navigationPreferencesStore';
-import {fetchRemoteAdminConfig, startRemoteAdminSync, subscribeRemoteAdminConfig, type RemoteAdminConfig} from '../../lib/services/remoteAdmin';
+import {fetchRemoteAdminConfig, getRemoteAdminConfig, startRemoteAdminSync, subscribeRemoteAdminConfig, type RemoteAdminConfig} from '../../lib/services/remoteAdmin';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Home'>;
 
@@ -284,18 +284,53 @@ const Home = ({}: Props) => {
   }, []);
   const closeDrawer = useCallback(() => setIsDrawerOpen(false), []);
   const openShortcutProvider = useCallback((providerValue: string) => {
-    const wanted = providerValue.trim().toLocaleLowerCase();
-    const target = useContentStore.getState().installedProviders.find(item =>
-      item.value.trim().toLocaleLowerCase() === wanted ||
-      item.display_name.trim().toLocaleLowerCase() === wanted,
-    );
+    const installed = useContentStore.getState().installedProviders || [];
+    const remoteConfig = getRemoteAdminConfig();
+    const configuredDefault = String(remoteConfig?.providers?.defaultProvider || '').trim();
+    const rawWanted = providerValue.trim();
+    const wantedValues = rawWanted.toLowerCase() === 'auto' && configuredDefault
+      ? [configuredDefault, rawWanted]
+      : [rawWanted];
+    const normalize = (value: string) => value.trim().toLocaleLowerCase().replace(/[^a-z0-9]/g, '');
+    const aliases: Record<string, string[]> = {
+      moviebox: ['movieboxweb', 'moviebox', 'movieboxapp'],
+      movieboxapp: ['moviebox', 'movieboxweb'],
+      movieboxweb: ['moviebox', 'movieboxapp'],
+      mxplayer: ['mxplayer'],
+      primevideo: ['primemirror', 'primevideo', 'prime'],
+      prime: ['primemirror', 'primevideo'],
+      disneyplus: ['disneymirror', 'disneyplus'],
+      netflix: ['netflixmirror', 'netflix'],
+    };
+    let target: ProviderExtension | undefined;
+    for (const wantedValue of wantedValues) {
+      const wanted = normalize(wantedValue);
+      target = installed.find(item =>
+        normalize(item.value) === wanted ||
+        normalize(item.display_name) === wanted,
+      );
+      if (target) break;
+      const aliasKeys = aliases[wanted] || [];
+      target = installed.find(item =>
+        aliasKeys.includes(normalize(item.value)) ||
+        aliasKeys.includes(normalize(item.display_name)),
+      );
+      if (target) break;
+    }
     if (target) {
       useContentStore.getState().setProvider(target);
+      setIsDrawerOpen(false);
       return;
     }
-    // Let the user install/select a provider if the admin configured one that is not installed yet.
-    openDrawer();
-  }, [openDrawer]);
+    // Do not open the provider drawer as a misleading overlay when the admin
+    // configured a provider that is not installed in this APK.
+    Alert.alert(
+      'Provider unavailable',
+      rawWanted.toLowerCase() === 'auto' && configuredDefault
+        ? `The configured default provider “${configuredDefault}” is not installed. Install/enable it in Settings first.`
+        : `“${rawWanted}” is configured in the admin panel but is not installed in this APK. Install/enable that provider in Settings first.`,
+    );
+  }, []);
   const acknowledgeNativeClose = useCallback(() => {
     // The library already animates overlay/gesture closes on the UI thread.
     // Commit controlled state in finishDrawerTransition, after that slide.
