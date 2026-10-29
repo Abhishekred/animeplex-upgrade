@@ -402,44 +402,9 @@ const Home = ({}: Props) => {
                     isVisible={heroVisible}
                     onOpenDrawer={openDrawer}
                     showHamburger={hamburgerMenuEnabled}
+                    homeShortcuts={homeShortcuts}
+                    onShortcutPress={openShortcutProvider}
                   />
-                  {homeShortcuts.length > 0 && (
-                    <View
-                      collapsable={false}
-                      style={{
-                        width: '100%',
-                        minHeight: 54,
-                        paddingHorizontal: 16,
-                        paddingVertical: 8,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        backgroundColor: colors.background,
-                      }}>
-                      {homeShortcuts.map(shortcut => (
-                        <Pressable
-                          key={shortcut.id}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Switch provider to ${shortcut.label}`}
-                          onPress={() => openShortcutProvider(shortcut.providerValue)}
-                          style={({pressed}) => ({
-                            alignSelf: 'flex-start',
-                            minHeight: 42,
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            backgroundColor: pressed ? '#D9D9D9' : '#FFFFFF',
-                            paddingVertical: 10,
-                            paddingHorizontal: 22,
-                            borderRadius: 28,
-                            opacity: pressed ? 0.82 : 1,
-                            elevation: 3,
-                          })}>
-                          <AppText style={{color: '#000000', fontSize: 15, fontWeight: '700'}}>
-                            {shortcut.label.trim()}
-                          </AppText>
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
                   {showContinueWatching && <ContinueWatching />}
                 </>
               }
