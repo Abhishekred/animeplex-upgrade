@@ -404,18 +404,19 @@ const Home = ({}: Props) => {
                     showHamburger={hamburgerMenuEnabled}
                   />
                   {homeShortcuts.length > 0 ? (
-                    <View
-                      collapsable={false}
-                      style={{
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled"
+                      contentContainerStyle={{
                         alignItems: 'center',
-                        flexDirection: 'row',
-                        flexWrap: 'wrap',
-                        justifyContent: 'center',
                         paddingHorizontal: 12,
                         paddingVertical: 12,
-                        minHeight: 58,
+                        minHeight: 68,
                         backgroundColor: colors.background,
-                      }}>
+                      }}
+                      style={{flexGrow: 0, backgroundColor: colors.background}}>
                       {homeShortcuts.map(shortcut => (
                         <Pressable
                           key={shortcut.id}
@@ -423,8 +424,7 @@ const Home = ({}: Props) => {
                           accessibilityLabel={`Switch provider to ${shortcut.label}`}
                           onPress={() => openShortcutProvider(shortcut.providerValue)}
                           style={({pressed}) => ({
-                            marginHorizontal: 4,
-                            marginVertical: 4,
+                            marginRight: 8,
                             borderRadius: 26,
                             overflow: 'hidden',
                             opacity: pressed ? 0.82 : 1,
@@ -455,7 +455,7 @@ const Home = ({}: Props) => {
                           </View>
                         </Pressable>
                       ))}
-                    </View>
+                    </ScrollView>
                   ) : null}
                   {showContinueWatching && <ContinueWatching />}
                 </>
