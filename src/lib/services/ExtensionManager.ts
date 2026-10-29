@@ -203,7 +203,7 @@ export class ExtensionManager {
             item.path === '' ||
             isValidProviderPath(item.path),
         )
-        .map((item: any, index: number) => ({
+        .map((item: any) => ({
           value: item.value,
           display_name: String(item.display_name || item.name || item.title || item.value),
           disabled: item.disabled || false,
