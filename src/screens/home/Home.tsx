@@ -402,9 +402,53 @@ const Home = ({}: Props) => {
                     isVisible={heroVisible}
                     onOpenDrawer={openDrawer}
                     showHamburger={hamburgerMenuEnabled}
-                    homeShortcuts={homeShortcuts}
-                    onShortcutPress={openShortcutProvider}
                   />
+                  {homeShortcuts.length > 0 ? (
+                    <View
+                      collapsable={false}
+                      style={{
+                        alignItems: 'center',
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        justifyContent: 'center',
+                        gap: 8,
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        minHeight: 54,
+                        backgroundColor: colors.background,
+                      }}>
+                      {homeShortcuts.map(shortcut => (
+                        <Pressable
+                          key={shortcut.id}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Switch provider to ${shortcut.label}`}
+                          onPress={() => openShortcutProvider(shortcut.providerValue)}
+                          style={({pressed}) => ({
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            minHeight: 42,
+                            paddingHorizontal: 22,
+                            paddingVertical: 9,
+                            borderRadius: 24,
+                            backgroundColor: pressed ? '#B91C1C' : '#DC2626',
+                            borderColor: '#FFFFFF',
+                            borderWidth: 1,
+                            elevation: 5,
+                            opacity: pressed ? 0.82 : 1,
+                          })}>
+                          <AppText
+                            style={{
+                              color: '#FFFFFF',
+                              fontSize: 15,
+                              fontWeight: '800',
+                              textAlign: 'center',
+                            }}>
+                            {shortcut.label.trim()}
+                          </AppText>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : null}
                   {showContinueWatching && <ContinueWatching />}
                 </>
               }
