@@ -205,7 +205,7 @@ export class ExtensionManager {
         )
         .map((item: any, index: number) => ({
           value: item.value,
-          display_name: `AnimePlex server ${index + 1}`,
+          display_name: String(item.display_name || item.name || item.title || item.value),
           disabled: item.disabled || false,
           source: {author: activeSource.author, url: activeSource.url},
           version: item.version,
@@ -565,8 +565,10 @@ export class ExtensionManager {
         }
       }
 
-      // Automatically install provider extensions on a clean install.
-      if (installed.length === 0 && !this.autoInstallStarted) {
+      // Sync every enabled provider from the source manifest, including existing
+      // installs. This upgrades legacy generic names and fills providers missing
+      // from older app installs without reinstalling providers already present.
+      if (!this.autoInstallStarted) {
         this.autoInstallStarted = true;
         void this.autoInstallDefaultProviders(source);
       }
@@ -578,34 +580,47 @@ export class ExtensionManager {
   private async autoInstallDefaultProviders(source: ProviderSource): Promise<void> {
     try {
       const providers = await this.fetchManifest(source, false);
-      const orderedProviders = [...providers].sort((left, right) => {
-        const isMovieBox = (provider: ProviderExtension) =>
-          provider.value.toLowerCase() === 'movieboxweb' ||
-          provider.display_name.toLowerCase() === 'moviebox web';
-        return Number(isMovieBox(right)) - Number(isMovieBox(left));
-      });
-      let defaultProviderSelected = false;
+      const existing = extensionStorage.getInstalledProviders();
+      const byValue = new Map(existing.map(provider => [provider.value, provider]));
 
-      // Install sequentially to avoid overwhelming low-memory devices. MovieBox
-      // is first so the home screen can become usable before the remaining sources finish.
+      // Refresh the canonical names/icons/types for already-installed providers.
+      // This fixes legacy entries that were all labelled "AnimePlex server N".
+      const refreshedInstalled = existing.map(installed => {
+        const latest = providers.find(provider => provider.value === installed.value);
+        if (!latest) return installed;
+        return {
+          ...installed,
+          display_name: latest.display_name,
+          icon: latest.icon,
+          type: latest.type,
+          disabled: latest.disabled,
+          version: latest.version,
+          hasSettings: latest.hasSettings,
+          path: latest.path,
+          source: latest.source,
+        };
+      });
+      extensionStorage.setInstalledProviders(refreshedInstalled);
+      useContentStore.getState().setInstalledProviders(refreshedInstalled);
+
+      const orderedProviders = providers
+        // Providers explicitly disabled in the upstream manifest are intentionally
+        // not installed; they are marked unavailable by the provider repository.
+        .filter(provider => !provider.disabled && !byValue.has(provider.value))
+        .sort((left, right) => {
+          const isMovieBox = (provider: ProviderExtension) =>
+            provider.value.toLowerCase() === 'movieboxweb' ||
+            provider.display_name.toLowerCase() === 'moviebox web';
+          return Number(isMovieBox(right)) - Number(isMovieBox(left));
+        });
+
+      // Sequential downloads protect low-memory phones. Install every enabled
+      // provider absent from an older install, continuing if an individual source fails.
       for (const provider of orderedProviders) {
         try {
           await this.installProvider(provider);
           const latestInstalled = extensionStorage.getInstalledProviders();
           useContentStore.getState().setInstalledProviders(latestInstalled);
-
-          if (!defaultProviderSelected && latestInstalled.length > 0) {
-            const movieBox = latestInstalled.find(
-              item => item.value.toLowerCase() === 'movieboxweb',
-            );
-            if (movieBox) {
-              useContentStore.getState().setProvider(movieBox);
-              defaultProviderSelected = true;
-            } else if (provider.value.toLowerCase() === 'movieboxweb') {
-              useContentStore.getState().setProvider(provider);
-              defaultProviderSelected = true;
-            }
-          }
         } catch (error) {
           console.warn('Skipping provider that failed to install:', provider.value, error);
         }
@@ -614,10 +629,14 @@ export class ExtensionManager {
       const latestInstalled = extensionStorage.getInstalledProviders();
       if (latestInstalled.length > 0) {
         useContentStore.getState().setInstalledProviders(latestInstalled);
-        const movieBox = latestInstalled.find(
-          provider => provider.value.toLowerCase() === 'movieboxweb',
-        );
-        if (!useContentStore.getState().provider.value) {
+        const current = useContentStore.getState().provider;
+        const refreshedCurrent = latestInstalled.find(item => item.value === current.value);
+        if (refreshedCurrent) {
+          useContentStore.getState().setProvider(refreshedCurrent);
+        } else if (!current.value) {
+          const movieBox = latestInstalled.find(
+            provider => provider.value.toLowerCase() === 'movieboxweb',
+          );
           useContentStore.getState().setProvider(movieBox || latestInstalled[0]);
         }
       }
