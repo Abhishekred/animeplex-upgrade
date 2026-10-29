@@ -411,10 +411,9 @@ const Home = ({}: Props) => {
                         flexDirection: 'row',
                         flexWrap: 'wrap',
                         justifyContent: 'center',
-                        gap: 8,
-                        paddingHorizontal: 16,
+                        paddingHorizontal: 12,
                         paddingVertical: 12,
-                        minHeight: 54,
+                        minHeight: 58,
                         backgroundColor: colors.background,
                       }}>
                       {homeShortcuts.map(shortcut => (
@@ -424,27 +423,36 @@ const Home = ({}: Props) => {
                           accessibilityLabel={`Switch provider to ${shortcut.label}`}
                           onPress={() => openShortcutProvider(shortcut.providerValue)}
                           style={({pressed}) => ({
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            minHeight: 42,
-                            paddingHorizontal: 22,
-                            paddingVertical: 9,
-                            borderRadius: 24,
-                            backgroundColor: pressed ? '#B91C1C' : '#DC2626',
-                            borderColor: '#FFFFFF',
-                            borderWidth: 1,
-                            elevation: 5,
+                            marginHorizontal: 4,
+                            marginVertical: 4,
+                            borderRadius: 26,
+                            overflow: 'hidden',
                             opacity: pressed ? 0.82 : 1,
                           })}>
-                          <AppText
+                          <View
                             style={{
-                              color: '#FFFFFF',
-                              fontSize: 15,
-                              fontWeight: '800',
-                              textAlign: 'center',
+                              minHeight: 44,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              paddingHorizontal: 20,
+                              paddingVertical: 10,
+                              borderRadius: 26,
+                              borderWidth: 1.5,
+                              borderColor: '#FFFFFF',
+                              backgroundColor: '#E11D48',
+                              elevation: 6,
                             }}>
-                            {shortcut.label.trim()}
-                          </AppText>
+                            <AppText
+                              style={{
+                                color: '#FFFFFF',
+                                fontSize: 15,
+                                fontWeight: '900',
+                                textAlign: 'center',
+                                includeFontPadding: true,
+                              }}>
+                              {shortcut.label.trim()}
+                            </AppText>
+                          </View>
                         </Pressable>
                       ))}
                     </View>
