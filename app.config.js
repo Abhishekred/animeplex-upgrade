@@ -189,7 +189,9 @@ module.exports = () => {
         ],
         allowBackup: true,
         adaptiveIcon: {
-          foregroundImage: './assets/aplogo.png',
+          // Use the launcher-safe artwork with transparent breathing room.
+          // The full-bleed app logo is cropped by Android's adaptive-icon mask.
+          foregroundImage: './assets/adaptive_icon.png',
           backgroundColor: '#000000',
         },
         launchMode: 'singleTask',
