@@ -62,7 +62,7 @@ const SearchResults = ({route, navigation}: Props): React.ReactElement => {
   const trueLoading = useMemo(
     () =>
       installedProviders.map(item => ({
-        name: item.display_name,
+        name: 'AnimePlex',
         value: item.value,
         isLoading: true,
         error: undefined as string | undefined, // explicitly type it
@@ -125,7 +125,7 @@ const SearchResults = ({route, navigation}: Props): React.ReactElement => {
             return;
           }
           const newData = {
-            title: item.display_name,
+            title: 'AnimePlex',
             Posts: outcome.posts,
             filter: route.params.filter,
             providerValue: item.value,
