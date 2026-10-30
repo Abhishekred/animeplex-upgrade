@@ -123,12 +123,8 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     pageKey: JSON.stringify([providerValue, route.params.link]),
     enabled: dynamicInfoAccentEnabled,
   });
-  const contentProviderName = useMemo(
-    () =>
-      providerValue === 'local' ? 'Local content' : installedProviders.find(item => item.value === providerValue)
-        ?.display_name || providerValue,
-    [installedProviders, providerValue],
-  );
+  const contentProviderName =
+    providerValue === 'local' ? 'Local content' : 'AnimePlex';
 
   const displayTitle = meta?.name || info?.title;
   const displayLogo = meta?.logo || info?.logo;
