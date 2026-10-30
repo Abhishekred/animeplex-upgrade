@@ -130,7 +130,7 @@ const SearchResults = ({route, navigation}: Props): React.ReactElement => {
             filter: route.params.filter,
             providerValue: item.value,
             value: item.value,
-            name: item.display_name,
+            name: 'AnimePlex',
           };
           if (newData.Posts.length > 0) {
             updateSearchData(newData);
