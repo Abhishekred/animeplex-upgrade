@@ -5,7 +5,7 @@ import {
   beginUIInteraction,
   endUIInteraction,
 } from '../../lib/performance/idleWork';
-import {Alert, RefreshControl, ScrollView, View, Modal, Pressable} from 'react-native';
+import {ActivityIndicator, Alert, RefreshControl, ScrollView, View, Modal, Pressable} from 'react-native';
 import {FlashList} from '@shopify/flash-list';
 import Slider from '../../components/Slider';
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
@@ -367,8 +367,25 @@ const Home = ({}: Props) => {
     installedProviders.length === 0 ||
     !provider?.value
   ) {
-    // Keep the launch screen clean while AnimePlex installs providers in the background.
-    return <View style={{flex: 1, backgroundColor: colors.background}} />;
+    // Avoid rendering an empty black screen while the admin-priority provider
+    // is being installed. Show a visible, themed startup state instead.
+    return (
+      <View
+        className="flex-1 items-center justify-center bg-m3-background"
+        style={{backgroundColor: colors.background}}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <AppText
+          role="titleMediumEmphasized"
+          className="mt-4 text-center">
+          Preparing AnimePlex
+        </AppText>
+        <AppText
+          role="bodyMedium"
+          className="mt-2 px-8 text-center text-m3-on-surface-variant">
+          Setting up your streaming providers. This may take a moment.
+        </AppText>
+      </View>
+    );
   }
 
   return (
