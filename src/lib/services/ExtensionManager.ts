@@ -7,6 +7,7 @@ import {
 } from '../storage/extensionStorage';
 import {mainStorage} from '../storage/StorageService';
 import useContentStore from '../zustand/contentStore';
+import {getRemoteAdminConfig} from './remoteAdmin';
 import {
   getSourceAuthHeaders,
   sourceTokenStorage,
@@ -603,15 +604,40 @@ export class ExtensionManager {
       extensionStorage.setInstalledProviders(refreshedInstalled);
       useContentStore.getState().setInstalledProviders(refreshedInstalled);
 
+      const configuredDefault = String(
+        getRemoteAdminConfig()?.providers?.defaultProvider ?? '',
+      ).trim();
+      const normalizeProvider = (value: string) =>
+        value.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const defaultKey = normalizeProvider(configuredDefault);
+      const defaultAliases: Record<string, string[]> = {
+        moviebox: ['movieboxweb', 'moviebox', 'movieboxapp'],
+        movieboxweb: ['movieboxweb', 'moviebox', 'movieboxapp'],
+        movieboxapp: ['movieboxweb', 'moviebox', 'movieboxapp'],
+        primevideo: ['primevideo', 'primemirror', 'prime'],
+        prime: ['primevideo', 'primemirror', 'prime'],
+        disneyplus: ['disneyplus', 'disneymirror'],
+        netflix: ['netflix', 'netflixmirror'],
+      };
+      const defaultMatches = (provider: ProviderExtension) => {
+        const candidates = [
+          normalizeProvider(provider.value),
+          normalizeProvider(provider.display_name),
+        ];
+        const aliases = defaultAliases[defaultKey] || [defaultKey];
+        return !!defaultKey && candidates.some(candidate =>
+          candidate === defaultKey || aliases.includes(candidate),
+        );
+      };
+
+      // Install the admin-configured default first, then continue sequentially.
+      // This gets the primary provider ready before the rest of the catalog.
       const orderedProviders = providers
-        // Providers explicitly disabled in the upstream manifest are intentionally
-        // not installed; they are marked unavailable by the provider repository.
         .filter(provider => !provider.disabled && !byValue.has(provider.value))
         .sort((left, right) => {
-          const isMovieBox = (provider: ProviderExtension) =>
-            provider.value.toLowerCase() === 'movieboxweb' ||
-            provider.display_name.toLowerCase() === 'moviebox web';
-          return Number(isMovieBox(right)) - Number(isMovieBox(left));
+          const leftIsDefault = defaultMatches(left);
+          const rightIsDefault = defaultMatches(right);
+          return Number(rightIsDefault) - Number(leftIsDefault);
         });
 
       // Sequential downloads protect low-memory phones. Install every enabled
@@ -621,6 +647,14 @@ export class ExtensionManager {
           await this.installProvider(provider);
           const latestInstalled = extensionStorage.getInstalledProviders();
           useContentStore.getState().setInstalledProviders(latestInstalled);
+
+          // Select the default as soon as its install completes, without waiting
+          // for the remaining providers to download.
+          const installedDefault = latestInstalled.find(defaultMatches);
+          const currentProvider = useContentStore.getState().provider;
+          if (installedDefault && !currentProvider.value) {
+            useContentStore.getState().setProvider(installedDefault);
+          }
         } catch (error) {
           console.warn('Skipping provider that failed to install:', provider.value, error);
         }
