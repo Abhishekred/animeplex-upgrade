@@ -603,6 +603,23 @@ export class ExtensionManager {
       extensionStorage.setInstalledProviders(refreshedInstalled);
       useContentStore.getState().setInstalledProviders(refreshedInstalled);
 
+      // Apply the configured default provider immediately when it is already
+      // installed. The remaining provider downloads continue in the background,
+      // so Home does not wait for every provider to finish installing.
+      const currentProvider = useContentStore.getState().provider;
+      const configuredDefault = providers.find(provider =>
+        !provider.disabled && (
+          provider.value.toLowerCase() === 'movieboxweb' ||
+          provider.display_name.toLowerCase() === 'moviebox web'
+        ),
+      );
+      const installedDefault = configuredDefault && refreshedInstalled.find(
+        item => item.value === configuredDefault.value,
+      );
+      if (!currentProvider.value && installedDefault) {
+        useContentStore.getState().setProvider(installedDefault);
+      }
+
       const orderedProviders = providers
         // Providers explicitly disabled in the upstream manifest are intentionally
         // not installed; they are marked unavailable by the provider repository.
