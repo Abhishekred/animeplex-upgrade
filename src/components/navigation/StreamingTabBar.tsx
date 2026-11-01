@@ -11,6 +11,7 @@ import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {settingsStorage} from '../../lib/storage';
 import {useM3Colors} from '../../theme/M3PaletteContext';
+import {getRemoteAdminConfig, subscribeRemoteAdminConfig} from '../../lib/services/remoteAdmin';
 import AppText from '../ui/Text';
 import {AnimatedTabIcon, type AnimatedTabIconName} from './AnimatedTabIcon';
 import {isTV} from '../../lib/tv/constants';
@@ -198,10 +199,12 @@ const StreamingTabButton = ({
           role={isFocused ? 'labelMediumEmphasized' : 'labelMedium'}
           numberOfLines={1}
           style={{
-            color: isFocused ? colors.onSurface : colors.onSurfaceVariant,
+            color: isFocused ? colors.onSurface : (colors as any).tabInactiveText,
+            fontFamily: (colors as any).tabFontFamily,
+            fontSize: (colors as any).tabFontSize,
             marginTop: 4,
             textAlign: 'center',
-            fontWeight: isFocused ? '600' : '400',
+            fontWeight: isFocused ? ((colors as any).tabFontWeight === '400' ? '600' : (colors as any).tabFontWeight) : (colors as any).tabFontWeight,
           }}>
           {label}
         </AppText>
@@ -216,6 +219,22 @@ const StreamingTabBar = ({
   navigation,
 }: BottomTabBarProps) => {
   const colors = useM3Colors();
+  const [remoteNav, setRemoteNav] = React.useState<any>(
+    () => getRemoteAdminConfig()?.navigationBar ?? {},
+  );
+  React.useEffect(
+    () => subscribeRemoteAdminConfig(config => setRemoteNav(config.navigationBar ?? {})),
+    [],
+  );
+  const navBackground = remoteNav.backgroundColor || colors.surfaceContainerHigh;
+  const navActiveIcon = remoteNav.activeIconColor || colors.onSecondaryContainer;
+  const navInactiveIcon = remoteNav.inactiveIconColor || colors.onSurfaceVariant;
+  const navActivePill = remoteNav.activePillColor || colors.secondaryContainer;
+  const navTextColor = remoteNav.textColor || colors.onSurface;
+  const navInactiveText = remoteNav.inactiveTextColor || colors.onSurfaceVariant;
+  const navFontFamily = remoteNav.fontFamily || undefined;
+  const navFontSize = Number(remoteNav.fontSize) || 12;
+  const navFontWeight = remoteNav.fontWeight || '400';
   const insets = useSafeAreaInsets();
   const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const isNavigationRail = isTV || Math.min(windowWidth, windowHeight) >= 600;
@@ -230,7 +249,7 @@ const StreamingTabBar = ({
   return (
     <View
       style={{
-        backgroundColor: colors.surfaceContainerHigh,
+        backgroundColor: navBackground,
         borderRightColor: isNavigationRail ? colors.outlineVariant : undefined,
         borderRightWidth: isNavigationRail ? StyleSheet.hairlineWidth : 0,
         height: isNavigationRail ? '100%' : undefined,
@@ -289,7 +308,17 @@ const StreamingTabBar = ({
               accessibilityLabel={descriptor.options.tabBarAccessibilityLabel}
               isNavigationRail={isNavigationRail}
               showLabels={showLabels}
-              colors={colors}
+              colors={{
+                ...colors,
+                secondaryContainer: navActivePill,
+                onSecondaryContainer: navActiveIcon,
+                onSurfaceVariant: navInactiveIcon,
+                onSurface: navTextColor,
+                tabInactiveText: navInactiveText,
+                tabFontFamily: navFontFamily,
+                tabFontSize: navFontSize,
+                tabFontWeight: navFontWeight,
+              }}
               onPress={onPress}
               onLongPress={() =>
                 navigation.emit({type: 'tabLongPress', target: route.key})
