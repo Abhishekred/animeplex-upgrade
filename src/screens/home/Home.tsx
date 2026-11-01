@@ -70,7 +70,7 @@ const Home = ({}: Props) => {
   const [drawerSceneActive, setDrawerSceneActive] = useState(false);
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const [isAtTop, setIsAtTop] = useState(true);
-  const [heroVisible, setHeroVisible] = useState(true);
+  const [heroVisible, setHeroVisible] = useState(false);
   const showContinueWatching = useNavigationPreferencesStore(
     state => state.showContinueWatching,
   );
@@ -171,7 +171,7 @@ const Home = ({}: Props) => {
     const offsetY = event.nativeEvent?.contentOffset?.y ?? 0;
     setStatusBarScrimVisible(offsetY > 12);
     setIsAtTop(offsetY <= 0);
-    setHeroVisible(offsetY < 410);
+    setHeroVisible(false);
   }, []);
 
   // Heroes are kept per provider, so a refetch does not pick new ones.
@@ -236,7 +236,7 @@ const Home = ({}: Props) => {
             filter: item.filter,
             posts: EMPTY_POSTS,
           }))
-        : homeData.map((item, index) => ({
+        : homeData.filter(item => !/anime/i.test(item.title) && !/anime/i.test(item.filter)).map((item, index) => ({
             key: JSON.stringify([
               provider.source?.author,
               provider.value,
@@ -432,12 +432,7 @@ const Home = ({}: Props) => {
               }
               ListHeaderComponent={
                 <>
-                  <HeroOptimized
-                    isDrawerOpen={isTV ? isDrawerOpen : drawerSceneActive}
-                    isVisible={heroVisible}
-                    onOpenDrawer={openDrawer}
-                    showHamburger={hamburgerMenuEnabled}
-                  />
+                  {null /* Hero banner hidden for the requested Home layout. */}
                   {homeShortcuts.length > 0 ? (
                     <ScrollView
                       horizontal
