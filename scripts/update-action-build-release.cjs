@@ -7,8 +7,7 @@ module.exports = async ({github, context, core, artifactDirectory}) => {
   const apkName = readFileSync(path.join(artifactDirectory, 'apk-name.txt'), 'utf8').trim();
   if (!/^vega-v[0-9][a-zA-Z0-9.+_-]*\.apk$/.test(apkName)) throw new Error('Invalid generated APK name');
   const assets = [
-    {name: apkName, file: 'vega-tv.apk', type: 'application/vnd.android.package-archive'},
-    {name: 'vega-tv-playstore.aab', type: 'application/octet-stream'},
+    {name: apkName, file: 'vega.apk', type: 'application/vnd.android.package-archive'},
   ];
   // Both outputs must exist before touching the previous successful draft.
   for (const asset of assets) {
@@ -31,7 +30,7 @@ module.exports = async ({github, context, core, artifactDirectory}) => {
   const currentAssets = await github.paginate(github.rest.repos.listReleaseAssets, {...repo, release_id: release.id, per_page: 100});
   for (const asset of assets) {
     await assertLatest();
-    for (const previous of currentAssets.filter(item => item.name === asset.name || (asset.file === 'vega-tv.apk' && (item.name === 'vega-tv.apk' || /^vega-v.*\.apk$/.test(item.name))))) {
+    for (const previous of currentAssets.filter(item => item.name === asset.name || (asset.file === 'vega.apk' && (/^vega-v.*\.apk$/.test(item.name) || item.name === 'vega-tv.apk' || item.name === 'vega-tv-playstore.aab')))) {
       await github.rest.repos.deleteReleaseAsset({...repo, asset_id: previous.id});
     }
     await github.rest.repos.uploadReleaseAsset({
@@ -49,5 +48,5 @@ module.exports = async ({github, context, core, artifactDirectory}) => {
     if (error.status !== 404) throw error;
   }
   await github.rest.repos.updateRelease({...metadata, release_id: release.id});
-  core.info('Updated the Action build draft with the TV APK and Play Store TV AAB.');
+  core.info('Updated the Action build draft with the unsigned Android phone APK.');
 };
