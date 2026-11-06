@@ -13,6 +13,7 @@ import {
   useSafeIsNavFocused,
   useTVNavFocusMemory,
 } from '../lib/tv/useTVNavFocusMemory';
+import useAdminConfigStore from '../lib/zustand/adminConfigStore';
 
 export const parseAspectRatio = (
   ratio?: number | string,
@@ -118,6 +119,7 @@ const MediaPosterCardBase = React.forwardRef<View, MediaPosterCardProps>(
     ref,
   ) => {
     const colors = useM3Colors();
+    const platformStyle = useAdminConfigStore(state => state.config?.platformStyle);
 
     const navigation = React.useContext(NavigationContext);
     const isNavFocused = useSafeIsNavFocused();
@@ -296,16 +298,23 @@ const MediaPosterCardBase = React.forwardRef<View, MediaPosterCardProps>(
                         intensity={45}
                         tint="systemMaterialDark"
                         style={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.20)',
+                          backgroundColor: typeof platformStyle?.backgroundColor === 'string'
+                            ? platformStyle.backgroundColor
+                            : 'rgba(255, 255, 255, 0.20)',
+                          borderColor: typeof platformStyle?.borderColor === 'string'
+                            ? platformStyle.borderColor
+                            : 'transparent',
+                          borderWidth: typeof platformStyle?.borderColor === 'string' ? 1 : 0,
                           paddingHorizontal: 7,
                           paddingVertical: 2.5,
                         }}>
                         <AppText
                           role="labelSmallEmphasized"
                           style={{
-                            color: '#FFFFFF',
-                            fontWeight: '800',
-                            fontSize: 10,
+                            color: typeof platformStyle?.textColor === 'string' ? platformStyle.textColor : '#FFFFFF',
+                            fontWeight: typeof platformStyle?.fontWeight === 'string' ? platformStyle.fontWeight as any : '800',
+                            fontSize: typeof platformStyle?.fontSize === 'number' ? platformStyle.fontSize : 10,
+                            fontFamily: typeof platformStyle?.fontFamily === 'string' && platformStyle.fontFamily.trim() ? platformStyle.fontFamily : undefined,
                             letterSpacing: 0.6,
                             textShadowColor: 'rgba(0, 0, 0, 0.85)',
                             textShadowOffset: {width: 0, height: 1},
