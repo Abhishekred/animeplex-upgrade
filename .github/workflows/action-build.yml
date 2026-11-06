@@ -7,7 +7,7 @@ on:
 
 concurrency:
   group: action-build-main
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -16,37 +16,59 @@ jobs:
   build:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: nightly
-    timeout-minutes: 150
+    timeout-minutes: 90
     permissions:
       contents: write
     env:
       CI: '1'
-      EXPO_TV: '1'
       EXPO_NO_TELEMETRY: '1'
-      MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-      MYAPP_UPLOAD_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-      MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      APP_VARIANT: standalone
       TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
       PROXY_API_URL: ${{ secrets.PROXY_API_URL }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - uses: actions/setup-java@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
         with:
-          # The default includes the retired SDK package "tools".
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
-      - uses: gradle/actions/setup-gradle@v4
 
-      - name: Install and verify Android CMake
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node22-
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            android/.gradle
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Install Android CMake
         shell: bash
         run: |
           set -euo pipefail
@@ -61,66 +83,50 @@ jobs:
             sleep 10
           done
 
-      - name: Load nightly signing credentials
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          export MYAPP_UPLOAD_STORE_FILE="$RUNNER_TEMP/action-build.keystore"
-          printf 'MYAPP_UPLOAD_STORE_FILE=%s\n' "$MYAPP_UPLOAD_STORE_FILE" >> "$GITHUB_ENV"
-          : "${KEYSTORE_BASE64:?Missing nightly KEYSTORE_BASE64 secret}"
-          : "${MYAPP_UPLOAD_STORE_PASSWORD:?Missing nightly KEYSTORE_PASSWORD secret}"
-          : "${MYAPP_UPLOAD_KEY_ALIAS:?Missing nightly KEY_ALIAS secret}"
-          : "${MYAPP_UPLOAD_KEY_PASSWORD:?Missing nightly KEY_PASSWORD secret}"
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$MYAPP_UPLOAD_STORE_FILE"
-          chmod 600 "$MYAPP_UPLOAD_STORE_FILE"
-          mkdir -p "$RUNNER_TEMP/action-build-files"
-
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate TV APK project
-        env:
-          APP_VARIANT: tv
+      - name: Generate Android phone project
         run: npm run build:sandbox && npx expo prebuild --platform android --clean --no-install
 
-      - name: Build signed TV APK (com.vega)
-        env:
-          APP_VARIANT: tv
+      - name: Configure unsigned release
         shell: bash
         run: |
           set -euo pipefail
+          GRADLE_FILE="android/app/build.gradle"
+          test -f "$GRADLE_FILE"
+          sed -i '/signingConfig signingConfigs\.release/d' "$GRADLE_FILE"
           chmod +x android/gradlew
-          cd android
-          ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=1 --no-parallel --console=plain --stacktrace \
-            '-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=768m -XX:+UseSerialGC' \
-            -Pkotlin.compiler.execution.strategy=in-process
-          cd ..
-          python3 scripts/check-tv-device-support.py
-          node scripts/collect-action-build.cjs apk "$RUNNER_TEMP/action-build-files/vega-tv.apk"
+          mkdir -p "$RUNNER_TEMP/action-build-files"
 
-      - name: Generate Play Store TV project
-        env:
-          APP_VARIANT: playstore
-        run: npm run build:sandbox && npx expo prebuild --platform android --clean --no-install
-
-      - name: Build signed Play Store TV AAB (vega.app)
-        env:
-          APP_VARIANT: playstore
+      - name: Build unsigned Android phone APK
         shell: bash
         run: |
           set -euo pipefail
-          chmod +x android/gradlew
           cd android
-          ./gradlew :app:bundleRelease --build-cache --no-daemon --max-workers=1 --no-parallel --console=plain --stacktrace \
-            '-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=768m -XX:+UseSerialGC' \
-            -Pkotlin.compiler.execution.strategy=in-process
-          cd ..
-          python3 scripts/check-tv-device-support.py
-          node scripts/collect-action-build.cjs aab "$RUNNER_TEMP/action-build-files/vega-tv-playstore.aab"
+          ./gradlew :app:assembleRelease --build-cache --no-daemon --max-workers=2 --no-parallel --console=plain --stacktrace \
+            '-Dorg.gradle.jvmargs=-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8'
 
-      # No Actions artifact upload: binaries stay in the draft release only.
+      - name: Verify unsigned APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_DIR="android/app/build/outputs/apk/release"
+          mapfile -t APKS < <(find "$APK_DIR" -maxdepth 1 -type f -name '*unsigned.apk')
+          if [ "${#APKS[@]}" -ne 1 ]; then
+            echo "Expected exactly one unsigned phone APK; found ${#APKS[@]}."
+            find "$APK_DIR" -maxdepth 1 -type f -name '*.apk' -print || true
+            exit 1
+          fi
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
+          test -n "$APKSIGNER"
+          if "$APKSIGNER" verify "${APKS[0]}" >/dev/null 2>&1; then
+            echo "ERROR: APK unexpectedly has a valid signature."
+            exit 1
+          fi
+          echo "Unsigned APK verified: ${APKS[0]}"
+          node scripts/collect-action-build.cjs apk "$RUNNER_TEMP/action-build-files/vega.apk"
+
       - name: Replace the Action build draft assets
         uses: actions/github-script@v7
         with:
@@ -129,8 +135,3 @@ jobs:
               github, context, core,
               artifactDirectory: `${process.env.RUNNER_TEMP}/action-build-files`,
             });
-
-      - name: Remove signing file
-        if: always()
-        shell: bash
-        run: rm -f -- "$RUNNER_TEMP/action-build.keystore"
