@@ -78,9 +78,12 @@ const Home = ({}: Props) => {
   const adminHamburgerEnabled = useAdminConfigStore(
     state => state.config?.features?.hamburgerMenu !== false,
   );
+  const adminProvidersEnabled = useAdminConfigStore(
+    state => state.config?.providers?.enabled !== false,
+  );
   const disableDrawer = useMemo(
-    () => mainStorage.getBool('disableDrawer') || !adminHamburgerEnabled,
-    [adminHamburgerEnabled],
+    () => mainStorage.getBool('disableDrawer') || !adminHamburgerEnabled || !adminProvidersEnabled,
+    [adminHamburgerEnabled, adminProvidersEnabled],
   );
 
   const provider = useContentStore(state => state.provider);
@@ -105,11 +108,13 @@ const Home = ({}: Props) => {
   const adminShortcuts = useAdminConfigStore(state => state.config?.homeShortcuts ?? []);
   const adminContent = useAdminConfigStore(state => state.config?.content);
   const visibleShortcuts = useMemo(
-    () => adminShortcuts.filter(item => item.enabled && installedProviders?.some(
+    () => adminProvidersEnabled
+      ? adminShortcuts.filter(item => item.enabled && installedProviders?.some(
       candidate => candidate.value.toLowerCase() === item.providerValue.toLowerCase() ||
         candidate.display_name.toLowerCase() === item.providerValue.toLowerCase(),
-    )),
-    [adminShortcuts, installedProviders],
+    ))
+      : [],
+    [adminProvidersEnabled, adminShortcuts, installedProviders],
   );
 
   const setHeroes = useHeroStore(state => state.setHeroes);
