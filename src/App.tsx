@@ -66,6 +66,7 @@ import {syncDohSettings} from './lib/services/dohService';
 import {syncWarpSettings} from './lib/services/warpService';
 import {syncByeDpiSettings} from './lib/services/byeDpiService';
 import {fetchAnimePlexAdminConfig} from './lib/services/adminConfig';
+import useAdminConfigStore from './lib/zustand/adminConfigStore';
 import {
   getInitialSourceIntent,
   setPendingSourceToken,
@@ -479,6 +480,7 @@ function TabStack() {
   const hideDownloadsTab = useNavigationPreferencesStore(
     state => state.hideDownloadsTab,
   );
+  const adminDownloadsEnabled = useAdminConfigStore(state => state.config?.features?.downloads !== false);
   const screenOptions = useMemo(
     () => ({
       animation: isTV ? ('shift' as const) : ('fade' as const),
@@ -511,7 +513,7 @@ function TabStack() {
         component={WatchListStackScreen}
         options={watchListTabOptions}
       />
-      {!hideDownloadsTab && (
+      {!hideDownloadsTab && adminDownloadsEnabled && (
         <Tab.Screen
           name="DownloadsStack"
           component={DownloadsStackScreen}
@@ -541,25 +543,68 @@ const App = () => {
   );
 
   // Load public settings controlled by AnimePlex Control Center.
-  // Network failure is non-fatal: the app continues with its local defaults.
+  // Remote settings are applied only to features with matching app support.
   useEffect(() => {
     let active = true;
     fetchAnimePlexAdminConfig().then(config => {
       if (!active || !config) return;
+      useAdminConfigStore.getState().setConfig(config);
+
+      const features = config.features;
+      if (typeof features?.continueWatching === 'boolean') {
+        useNavigationPreferencesStore.getState().setShowContinueWatching(
+          features.continueWatching,
+        );
+      }
+      if (typeof features?.autoPlay === 'boolean') {
+        settingsStorage.setAutoPlayNextEpisode(features.autoPlay);
+      }
+
+      const installed = useContentStore.getState().installedProviders;
+      if (config.providers?.enabled !== false && installed.length) {
+        const requestedOrder = (config.providers?.priority || [])
+          .map(value => installed.find(provider =>
+            provider.value.toLowerCase() === value.toLowerCase() ||
+            provider.display_name.toLowerCase() === value.toLowerCase(),
+          )?.value)
+          .filter((value): value is string => Boolean(value));
+        if (requestedOrder.length) {
+          const remaining = installed.map(provider => provider.value)
+            .filter(value => !requestedOrder.includes(value));
+          settingsStorage.setProviderOrder([...requestedOrder, ...remaining]);
+          useContentStore.getState().setInstalledProviders(installed);
+        }
+        const defaultValue = config.providers?.defaultProvider?.toLowerCase();
+        const defaultProvider = defaultValue
+          ? installed.find(provider =>
+              provider.value.toLowerCase() === defaultValue ||
+              provider.display_name.toLowerCase() === defaultValue,
+            )
+          : undefined;
+        if (defaultProvider && !defaultProvider.disabled) {
+          useContentStore.getState().setProvider(defaultProvider);
+        }
+      }
+
       const general = config.general;
-      if (general?.maintenanceMode) {
+      if (general?.maintenanceMode && config.notifications?.maintenanceAlerts !== false) {
         Alert.alert(
           'AnimePlex maintenance',
           general.announcementMessage ||
+            config.providers?.maintenanceMessage ||
             'AnimePlex is temporarily under maintenance. Please try again later.',
         );
-      } else if (general?.announcementEnabled && general.announcementMessage) {
+      } else if (
+        general?.announcementEnabled &&
+        general.announcementMessage &&
+        config.notifications?.inApp !== false
+      ) {
         Alert.alert(
           general.announcementTitle || 'AnimePlex announcement',
           general.announcementMessage,
         );
       }
-    });
+    }).catch(error => console.warn('[AnimePlex Admin] Apply config failed:', error));
     return () => {
       active = false;
     };
