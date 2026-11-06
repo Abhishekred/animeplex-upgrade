@@ -18,12 +18,13 @@ import {
 } from 'react-native';
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import {HomeStackParamList, TabStackParamList} from '../../App';
+import {isSafeExternalUrl} from '../../lib/sandbox/urlGuard';
 import Button from '../../components/ui/Button';
 import AppText from '../../components/ui/Text';
 import {QueryErrorBoundary} from '../../components/ErrorBoundary';
 import SeasonList from '../../components/SeasonList';
 import ScreenOverlayHost from '../../components/ScreenOverlayHost';
-import LocalSeasonList from '../../components/local-content/LocalSeasonList';
+import LocalEpisodeList from '../../components/local-content/LocalEpisodeList';
 import SkeletonLoader from '../../components/Skeleton';
 import {useContentDetails} from '../../lib/hooks/useContentInfo';
 import {useArtworkShape} from '../../lib/hooks/useHomePageData';
@@ -39,6 +40,7 @@ import ContentOverview from './components/ContentOverview';
 import InfoStoryModal from './components/InfoStoryModal';
 import LibraryCollectionDialog from '../../components/library/LibraryCollectionDialog';
 import ProviderMetadataDialog from '../../components/metadata/ProviderMetadataDialog';
+import LocalMetadataDialog from '../../components/metadata/LocalMetadataDialog';
 import InfoSkeleton from './components/InfoSkeleton';
 import StatusBarScrim from '../../components/ui/StatusBarScrim';
 import {TVFocusGuide} from '../../components/tv';
@@ -123,8 +125,12 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
     pageKey: JSON.stringify([providerValue, route.params.link]),
     enabled: dynamicInfoAccentEnabled,
   });
-  const contentProviderName =
-    providerValue === 'local' ? 'Local content' : 'AnimePlex';
+  const contentProviderName = useMemo(
+    () =>
+      providerValue === 'local' ? 'Local content' : installedProviders.find(item => item.value === providerValue)
+        ?.display_name || providerValue,
+    [installedProviders, providerValue],
+  );
 
   const displayTitle = meta?.name || info?.title;
   const displayLogo = meta?.logo || info?.logo;
@@ -249,10 +255,21 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
   }, [displayTitle, searchNavigation]);
 
   const handleOpenWeb = useCallback(() => {
-    Linking.openURL('https://www.instagram.com/animeplexofficial?srtk=MTR3OWY4NjVqNGhheg==').catch(() => {
-      ToastAndroid.show('Unable to open Instagram', ToastAndroid.SHORT);
-    });
-  }, []);
+    if (!webUrl) {
+      return;
+    }
+    if (settingsStorage.isSkipInAppWebview()) {
+      if (!isSafeExternalUrl(webUrl)) {
+        ToastAndroid.show('Unsupported link', ToastAndroid.SHORT);
+        return;
+      }
+      Linking.openURL(webUrl).catch(() => {
+        ToastAndroid.show('Failed to open browser', ToastAndroid.SHORT);
+      });
+    } else {
+      navigation.navigate('Webview', {link: webUrl});
+    }
+  }, [navigation, webUrl]);
 
   if (error && !info) {
     return (
@@ -348,7 +365,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                   isLoading={isLoading && !info}
                   logo={displayLogo}
                   onBack={navigation.goBack}
-                  onOpenMenu={!localTitle ? () => setMetadataMenuVisible(true) : undefined}
+                  onOpenMenu={() => setMetadataMenuVisible(true)}
                   backButtonRef={backButtonRef}
                   onBackButtonLayout={registerBackFocus}
                   onOpenStory={
@@ -357,7 +374,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                       : undefined
                   }
                   exploreRef={exploreRef}
-                  onOpenWeb={handleOpenWeb}
+                  onOpenWeb={webUrl ? handleOpenWeb : undefined}
                   onSearchTitle={searchTitle}
                   onToggleLibrary={toggleLibrary}
                   onToggleSynopsis={() => setReadMore(value => !value)}
@@ -384,9 +401,7 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
                       <SkeletonLoader show height={72} width="100%" />
                     </View>
                   ) : localTitle ? (
-                    <LocalSeasonList title={localTitle} onEditMetadata={() => searchNavigation.navigate('WatchListStack', {
-                      screen: 'LocalContent', params: {editId: localTitle.id},
-                    } as never)} />
+                    <LocalEpisodeList title={localTitle} />
                   ) : (
                     <SeasonList
                       refreshing={refreshing}
@@ -452,6 +467,11 @@ export default function Info({route, navigation}: Props): React.JSX.Element {
               provider: providerValue,
             }}
           />
+          {localTitle && <LocalMetadataDialog
+            visible={metadataMenuVisible}
+            onClose={() => setMetadataMenuVisible(false)}
+            title={localTitle}
+          />}
           {info && !localTitle && <ProviderMetadataDialog
             visible={metadataMenuVisible}
             onClose={() => setMetadataMenuVisible(false)}

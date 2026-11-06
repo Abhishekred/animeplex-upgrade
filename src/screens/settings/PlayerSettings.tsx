@@ -1,3 +1,4 @@
+import ExternalAppPreference from './components/ExternalAppPreference';
 import DropdownField from '../../components/ui/DropdownField';
 import {getPlayerControlStyleRows} from '../../components/PlayerControlStyleEditor';
 import {useFocusEffect} from '@react-navigation/native';
@@ -60,6 +61,10 @@ export default function PlayerSettings({navigation}: Props) {
 
   const [autoPlayNextEpisode, setAutoPlayNextEpisode] = useState<boolean>(() =>
     settingsStorage.isAutoPlayNextEpisodeEnabled(),
+  );
+
+  const [showTimeRemaining, setShowTimeRemaining] = useState<boolean>(() =>
+    settingsStorage.isShowTimeRemaining(),
   );
 
   const [enableSwipeGesture, setEnableSwipeGesture] = useState<boolean>(() =>
@@ -252,6 +257,7 @@ export default function PlayerSettings({navigation}: Props) {
                 setOpenExternalPlayer(next);
               }}
             />
+            <ExternalAppPreference kind="player" />
             <SettingsSwitchRow
               title="Notification media controls"
               value={showMediaControls}
@@ -287,6 +293,15 @@ export default function PlayerSettings({navigation}: Props) {
               onValueChange={next => {
                 settingsStorage.setAutoPlayNextEpisode(next);
                 setAutoPlayNextEpisode(next);
+              }}
+            />
+            <SettingsSwitchRow
+              title="Show remaining time"
+              description="Display time remaining instead of total duration on the timeline (tap time to toggle)"
+              value={showTimeRemaining}
+              onValueChange={next => {
+                settingsStorage.setShowTimeRemaining(next);
+                setShowTimeRemaining(next);
               }}
             />
             <SettingsSwitchRow

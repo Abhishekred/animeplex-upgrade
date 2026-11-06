@@ -130,7 +130,7 @@ class UpdateProvidersService {
   /**
    * Update a specific provider
    */
-  async updateProvider(provider: ProviderExtension, options?: {automatic?: boolean}): Promise<boolean> {
+  async updateProvider(provider: ProviderExtension, options?: {automatic?: boolean; throwOnError?: boolean}): Promise<boolean> {
     try {
       if (options?.automatic && !settingsStorage.isProviderAutoUpdateEnabled()) return false;
       return await extensionManager.updateProvider(provider, options?.automatic ? () => settingsStorage.isProviderAutoUpdateEnabled() : undefined);
@@ -142,6 +142,7 @@ class UpdateProvidersService {
         throw error;
       }
       console.error('Error updating provider:', error);
+      if (options?.throwOnError) throw error;
       return false;
     }
   }
@@ -189,7 +190,7 @@ class UpdateProvidersService {
         const currentActive = useContentStore.getState().provider;
         if (currentActive) {
           const updatedActive = latestInstalled.find(
-            p => p.value === currentActive.value,
+            p => p.value === currentActive.value && p.source?.author === currentActive.source?.author,
           );
           if (updatedActive) {
             useContentStore.getState().setProvider(updatedActive);
@@ -224,7 +225,7 @@ class UpdateProvidersService {
     } catch (error) {
       if (
         error instanceof Error &&
-        error.message.includes('rate limit')
+        error.message.includes('rate limit') && settingsStorage.isNotificationsEnabled() && settingsStorage.isProviderAutoUpdateEnabled()
       ) {
         await notificationService.displayUpdateNotification({
           id: 'rate-limit-warning',

@@ -21,6 +21,7 @@ import {
   isDetailedLoggingEnabled,
   setDetailedLogging,
   shareLogs,
+  clearLogs,
 } from '../../lib/logging/vegaLog';
 import {useRemoteStore} from '../../lib/remote/remoteStore';
 
@@ -101,35 +102,23 @@ export const checkForUpdate = async (
 ) => {
   setUpdateLoading(true);
   try {
-    // AnimePlex updates are managed exclusively from the Admin Panel manifest.
-    // Do not fall back to the upstream Vega release feed.
-    const manifestResponse = await fetch(
-      'https://raw.githubusercontent.com/Abhishekred/Animeplex-Admin-panel/main/release.json',
-      {headers: {'Cache-Control': 'no-cache'}},
+    const res = await fetch(
+      'https://api.github.com/repos/vega-org/vega-app/releases/latest',
     );
-    if (!manifestResponse.ok) {
-      throw new Error(`AnimePlex Admin update manifest unavailable (HTTP ${manifestResponse.status})`);
+    if (res.status === 403 || res.status === 429) {
+      ToastAndroid.show(
+        'GitHub API rate limit exceeded. Please wait a few minutes before trying again.',
+        ToastAndroid.LONG,
+      );
+      setUpdateLoading(false);
+      return;
     }
-    const manifest = await manifestResponse.json();
-    if (!manifest?.version) {
-      throw new Error('AnimePlex Admin has not published a valid release version');
+    if (!res.ok) {
+      throw new Error(`GitHub release check failed with status ${res.status}`);
     }
-    const apkUrl = typeof manifest.apkUrl === 'string' ? manifest.apkUrl.trim() : '';
-    const apkName = apkUrl.split('/').pop()?.split('?')[0] || 'AnimePlex-update.apk';
-    const data: any = {
-      tag_name: String(manifest.version).startsWith('v')
-        ? String(manifest.version)
-        : `v${manifest.version}`,
-      body: manifest.releaseNotes || manifest.title || 'AnimePlex update available.',
-      assets: apkUrl && apkUrl.toLowerCase().split('?')[0].endsWith('.apk')
-        ? [{name: apkName, browser_download_url: apkUrl}]
-        : [],
-      html_url: apkUrl || 'https://animeplex-admin-panel.vercel.app/',
-      forceUpdate: Boolean(manifest.forceUpdate),
-      minimumVersion: manifest.minimumVersion || '0.0.0',
-    };
+    const data = await res.json();
     if (!data?.tag_name) {
-      throw new Error('Invalid release data received from AnimePlex admin or GitHub');
+      throw new Error('Invalid release data received from GitHub');
     }
     const localVersion = Application.nativeApplicationVersion;
     const remoteVersion = Number(
@@ -147,20 +136,24 @@ export const checkForUpdate = async (
             label: 'Update',
             variant: 'primary',
             onPress: () => {
-              const apkAsset = data?.assets?.find((asset: any) =>
-                asset.name?.toLowerCase().endsWith('.apk'),
-              );
-              if (autoDownload && apkAsset) {
-                return downloadUpdate(apkAsset.browser_download_url, apkAsset.name);
-              }
-              if (!apkAsset) {
-                ToastAndroid.show(
-                  'Update is published, but the Admin Panel APK URL is missing or invalid.',
-                  ToastAndroid.LONG,
+              const targetKeyword = isTV ? 'tv' : 'mobile';
+              const apkAsset =
+                data?.assets?.find(
+                  (asset: any) =>
+                    asset.name?.endsWith('.apk') &&
+                    asset.name?.toLowerCase().includes(targetKeyword),
+                ) ||
+                data?.assets?.find(
+                  (asset: any) =>
+                    asset.name?.endsWith('.apk') &&
+                    asset.name?.toLowerCase().includes('universal'),
+                ) ||
+                data?.assets?.find((asset: any) =>
+                  asset.name?.endsWith('.apk'),
                 );
-                return Linking.openURL('https://animeplex-admin-panel.vercel.app/');
-              }
-              return Linking.openURL(apkAsset.browser_download_url);
+              return autoDownload && apkAsset
+                ? downloadUpdate(apkAsset.browser_download_url, apkAsset.name)
+                : Linking.openURL(data.html_url);
             },
           },
         ],
@@ -210,6 +203,19 @@ const About = ({navigation}: any) => {
     isDetailedLoggingEnabled,
   );
   const [exportingLogs, setExportingLogs] = useState(false);
+  const [clearingLogs, setClearingLogs] = useState(false);
+
+  const handleClearLogs = async () => {
+    setClearingLogs(true);
+    try {
+      await clearLogs();
+      ToastAndroid.show('Logs cleared', ToastAndroid.SHORT);
+    } catch (error: any) {
+      ToastAndroid.show(error?.message || 'Could not clear logs', ToastAndroid.SHORT);
+    } finally {
+      setClearingLogs(false);
+    }
+  };
 
   const exportLogs = async () => {
     setExportingLogs(true);
@@ -285,7 +291,7 @@ const About = ({navigation}: any) => {
             <AppText
               role="headlineLargeEmphasized"
               className="text-m3-on-background">
-              About AnimePlex
+              About Vega
             </AppText>
           </View>
           <AppText role="bodyLarge" className="mt-1 text-m3-on-surface-variant">
@@ -296,7 +302,7 @@ const About = ({navigation}: any) => {
         <SettingsSection title="App">
           <SettingsRow
             title="Version"
-            description={`AnimePlex ${Application.nativeApplicationVersion || ''}`}
+            description={`Vega ${Application.nativeApplicationVersion || ''}`}
             icon="information-outline"
             divider={Constants.expoConfig?.extra?.isPlayStore}
           />
@@ -316,7 +322,7 @@ const About = ({navigation}: any) => {
               />
               <SettingsSwitchRow
                 title="Check on startup"
-                description="Look for a new AnimePlex release when the app opens"
+                description="Look for a new release when Vega opens"
                 value={autoCheckUpdate}
                 onValueChange={next => {
                   setAutoCheckUpdate(next);
@@ -356,11 +362,18 @@ const About = ({navigation}: any) => {
               title="Export logs"
               description="Share recent app logs with the developer. Links and sign-in data are removed."
               icon="file-document-outline"
-              divider={false}
               trailing={
                 exportingLogs ? <LoadingIndicator size={14} /> : undefined
               }
-              onPress={exportingLogs ? undefined : exportLogs}
+              onPress={exportingLogs || clearingLogs ? undefined : exportLogs}
+            />
+            <SettingsRow
+              title="Clear logs"
+              description="Clear old logs before reproducing a problem."
+              icon="delete-outline"
+              divider={false}
+              trailing={clearingLogs ? <LoadingIndicator size={14} /> : undefined}
+              onPress={clearingLogs || exportingLogs ? undefined : handleClearLogs}
             />
           </SettingsSection>
         )}

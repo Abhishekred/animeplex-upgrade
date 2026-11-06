@@ -1107,10 +1107,9 @@ index 0000000..8000c98
 +    }
 +}
 diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt
-index bb945fe..490de1f 100644
 --- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt
 +++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt
-@@ -6,10 +6,13 @@ import android.graphics.drawable.GradientDrawable
+@@ -6,10 +6,13 @@
  import android.util.AttributeSet
  import android.view.View
  import android.view.View.MeasureSpec
@@ -1124,7 +1123,7 @@ index bb945fe..490de1f 100644
  import androidx.media3.common.util.UnstableApi
  import androidx.media3.exoplayer.ExoPlayer
  import androidx.media3.ui.AspectRatioFrameLayout
-@@ -52,17 +55,32 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
+@@ -52,17 +55,39 @@
          resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
      }
  
@@ -1146,6 +1145,13 @@ index bb945fe..490de1f 100644
          addView(liveBadge, liveBadgeLayoutParams)
      }
  
++    // Scale only PlayerView. The existing subtitle overlay is its unscaled sibling.
++    fun setVideoZoom(zoom: Float) {
++        val scale = if (zoom.isFinite()) zoom.coerceAtLeast(1f) else 1f
++        playerView.scaleX = scale
++        playerView.scaleY = scale
++    }
++
 +    fun onCues(cueGroup: CueGroup) {
 +        customSubtitleOverlay.setCues(cueGroup.cues)
 +    }
@@ -1157,7 +1163,7 @@ index bb945fe..490de1f 100644
      fun setPlayer(player: ExoPlayer?) {
          val currentPlayer = playerView.player
  
-@@ -79,6 +97,11 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
+@@ -79,6 +104,11 @@
              pendingResizeMode?.let { resizeMode ->
                  playerView.resizeMode = resizeMode
              }
@@ -1169,7 +1175,7 @@ index bb945fe..490de1f 100644
          }
      }
  
-@@ -108,31 +131,13 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
+@@ -108,31 +138,13 @@
      }
  
      fun setSubtitleStyle(style: SubtitleStyle) {
@@ -1207,7 +1213,7 @@ index bb945fe..490de1f 100644
      }
  
      fun setShutterColor(color: Int) {
-@@ -223,6 +228,15 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
+@@ -223,6 +235,15 @@
      }
  
      private val playerListener = object : Player.Listener {
@@ -2189,7 +2195,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
      private DefaultTrackSelector trackSelector;
      private boolean playerNeedsSource;
      private ServiceConnection playbackServiceConnection;
-@@ -203,6 +218,55 @@
+@@ -203,6 +218,61 @@
  
      private int resumeWindow;
      private long resumePosition;
@@ -2200,6 +2206,11 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
 +    private boolean activeVideoDecoderSoftware = false;
 +    private Format decoderSwitchFormat;
 +    @Nullable private Boolean recoveryVideoDecoderSoftware;
++    private final java.util.Set<String> failedVideoDecoders = new java.util.HashSet<>();
++
++    public void setVideoZoom(float zoom) {
++        exoPlayerView.setVideoZoom(zoom);
++    }
 +
 +    public WritableMap getVideoDecoderStatus() {
 +        WritableMap status = Arguments.createMap();
@@ -2232,6 +2243,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
 +        if (!activeVideoDecoderName.isEmpty() && activeVideoDecoderSoftware == software) return false;
 +        decoderSwitchFormat = format;
 +        recoveryVideoDecoderSoftware = null;
++        failedVideoDecoders.clear();
 +        softwareVideoDecoder = software;
 +        float gain = playbackDelays.volumeGain;
 +        releasePlayer(); // Saves the current playback position before releasing the decoder.
@@ -2245,7 +2257,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
      private boolean loadVideoStarted;
      private boolean isFullscreen;
      private boolean isInBackground;
-@@ -213,6 +277,8 @@
+@@ -213,6 +283,8 @@
      private PictureInPictureParams.Builder pictureInPictureParamsBuilder;
      private boolean hasAudioFocus = false;
      private float rate = 1f;
@@ -2254,7 +2266,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
      private AudioOutput audioOutput = AudioOutput.SPEAKER;
      private float audioVolume = 1f;
      private int maxBitRate = 0;
-@@ -234,6 +300,7 @@
+@@ -234,6 +306,7 @@
      private boolean isSeeking = false;
      private long seekPosition = -1;
      private boolean hasVideoEnded = false;
@@ -2262,7 +2274,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
  
      // Props from React
      private Source source = new Source();
-@@ -562,8 +629,19 @@
+@@ -562,8 +635,19 @@
      }
  
      private class RNVLoadControl extends DefaultLoadControl {
@@ -2282,7 +2294,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
          public RNVLoadControl(DefaultAllocator allocator, BufferConfig config) {
              super(allocator,
                      config.getMinBufferMs() != BufferConfig.Companion.getBufferConfigPropUnsetInt()
-@@ -583,17 +661,92 @@
+@@ -583,17 +667,92 @@
                      config.getBackBufferDurationMs() != BufferConfig.Companion.getBufferConfigPropUnsetInt()
                              ? config.getBackBufferDurationMs()
                              : DefaultLoadControl.DEFAULT_BACK_BUFFER_DURATION_MS,
@@ -2380,7 +2392,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
              if (bufferingStrategy == BufferingStrategy.BufferingStrategyEnum.DisableBuffering) {
                  return false;
              } else if (bufferingStrategy == BufferingStrategy.BufferingStrategyEnum.DependingOnMemory) {
-@@ -601,7 +754,9 @@
+@@ -601,7 +760,9 @@
                  // when available memory on device become low.
                  int loadedBytes = getAllocator().getTotalBytesAllocated();
                  boolean isHeapReached = availableHeapInBytes > 0 && loadedBytes >= availableHeapInBytes;
@@ -2391,7 +2403,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                      return false;
                  }
                  long usedMemory = runtime.totalMemory() - runtime.freeMemory();
-@@ -609,7 +764,7 @@
+@@ -609,7 +770,7 @@
                  double minBufferMemoryReservePercent = source.getBufferConfig().getMinBufferMemoryReservePercent() != BufferConfig.Companion.getBufferConfigPropUnsetDouble()
                          ? source.getBufferConfig().getMinBufferMemoryReservePercent()
                          : ReactExoplayerView.DEFAULT_MIN_BUFFER_MEMORY_RESERVE;
@@ -2400,7 +2412,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                  long bufferedMs = bufferedDurationUs / (long) 1000;
                  if (reserveMemory > freeMemory && bufferedMs > 2000) {
                      // We don't have enough memory in reserve so we stop buffering to allow other components to use it instead
-@@ -622,7 +777,128 @@
+@@ -622,7 +783,128 @@
                  }
              }
              // "default" case or normal case for "DependingOnMemory"
@@ -2530,7 +2542,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
          }
      }
  
-@@ -715,11 +991,12 @@
+@@ -715,11 +997,12 @@
      private void initializePlayerCore(ReactExoplayerView self) {
          ExoTrackSelection.Factory videoTrackSelectionFactory = new AdaptiveTrackSelection.Factory();
          self.trackSelector = new DefaultTrackSelector(getContext(), videoTrackSelectionFactory);
@@ -2544,7 +2556,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                  allocator,
                  source.getBufferConfig()
          );
-@@ -731,9 +1008,27 @@
+@@ -731,10 +1014,31 @@
          }
  
          DefaultRenderersFactory renderersFactory =
@@ -2556,8 +2568,11 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
 +                        .setMediaCodecSelector((mime, secure, tunneling) -> {
 +                            List<MediaCodecInfo> candidates = new ArrayList<>(MediaCodecUtil.getDecoderInfos(mime, secure, tunneling));
 +                            if (mime.startsWith("video/")) {
-+                                if (recoveryVideoDecoderSoftware != null) {
-+                                    candidates.removeIf(info -> recoveryVideoDecoderSoftware ? !info.softwareOnly : !info.hardwareAccelerated);
++                                candidates.removeIf(info -> failedVideoDecoders.contains(info.name));
++                                if (!failedVideoDecoders.isEmpty() && decoderSwitchFormat != null) {
++                                    for (int i = candidates.size() - 1; i >= 0; i--) {
++                                        if (!candidates.get(i).isFormatSupported(decoderSwitchFormat)) candidates.remove(i);
++                                    }
 +                                }
 +                                // Prefer the saved mode, retaining the other implementations for silent fallback.
 +                                candidates.sort(java.util.Comparator.comparingInt(info ->
@@ -2574,7 +2589,8 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
 +        }
  
          DefaultMediaSourceFactory mediaSourceFactory;
-@@ -759,7 +1054,20 @@
+         
+@@ -759,7 +1063,20 @@
          ReactNativeVideoManager.Companion.getInstance().onInstanceCreated(instanceId, player);
          refreshDebugState();
          player.addListener(self);
@@ -2596,7 +2612,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
          exoPlayerView.setPlayer(player);
  
          audioBecomingNoisyReceiver.setListener(self);
-@@ -875,6 +1183,10 @@
+@@ -875,6 +1192,10 @@
                  Thread.currentThread().interrupt();
                  DebugLog.e(TAG, ex.toString());
              }
@@ -2607,7 +2623,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
          }
  
          boolean haveResumePosition = resumeWindow != C.INDEX_UNSET;
-@@ -969,10 +1281,19 @@
+@@ -969,10 +1290,19 @@
          Intent intent = new Intent(themedReactContext, VideoPlaybackService.class);
          intent.setAction(MediaSessionService.SERVICE_INTERFACE);
  
@@ -2631,7 +2647,8 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
          }
  
          int flags;
-@@ -1089,6 +1410,7 @@
+@@ -1088,7 +1418,8 @@
+ 
                  mediaSourceFactory = new HlsMediaSource.Factory(
                          dataSourceFactory
 -                ).setAllowChunklessPreparation(source.getTextTracksAllowChunklessPreparation());
@@ -2640,7 +2657,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                  break;
              case CONTENT_TYPE_OTHER:
                  if ("asset".equals(uri.getScheme())) {
-@@ -1100,12 +1422,16 @@
+@@ -1100,12 +1431,18 @@
                      }
                  } else if ("file".equals(uri.getScheme()) ||
                          !useCache) {
@@ -2648,18 +2665,20 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                      mediaSourceFactory = new ProgressiveMediaSource.Factory(
 -                            mediaDataSourceFactory
 +                            new ChainedMatroskaDataSource.Factory(
-+                                    new ParallelDataSource.Factory(mediaDataSourceFactory))
++                                    new ParallelDataSource.Factory(mediaDataSourceFactory)),
++                            new RecoveringMatroskaExtractor.Factory()
                      );
                  } else {
 +                    DataSource.Factory cachedDataSourceFactory =
 +                            RNVSimpleCache.INSTANCE.getCacheFactory(buildHttpDataSourceFactory(true));
                      mediaSourceFactory = new ProgressiveMediaSource.Factory(
 -                            RNVSimpleCache.INSTANCE.getCacheFactory(buildHttpDataSourceFactory(true))
-+                            new ChainedMatroskaDataSource.Factory(cachedDataSourceFactory)
++                            new ChainedMatroskaDataSource.Factory(cachedDataSourceFactory),
++                            new RecoveringMatroskaExtractor.Factory()
                      );
  
                  }
-@@ -1144,12 +1470,63 @@
+@@ -1144,12 +1479,63 @@
                  ? overridenMediaItemBuilder.build()
                  : mediaItemBuilder.build();
  
@@ -2724,7 +2743,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
  
          if (cropStartMs >= 0 && cropEndMs >= 0) {
              return new ClippingMediaSource(mediaSource, cropStartMs * 1000, cropEndMs * 1000);
-@@ -1160,6 +1537,109 @@
+@@ -1160,6 +1546,109 @@
          }
  
          return mediaSource;
@@ -2834,7 +2853,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
      }
  
      @Nullable
-@@ -1183,9 +1663,23 @@
+@@ -1183,9 +1672,23 @@
                      }
                  }
                  
@@ -2859,7 +2878,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                          .setLabel(label)
                          .setRoleFlags(C.ROLE_FLAG_SUBTITLE);
                  
-@@ -1219,6 +1713,7 @@
+@@ -1219,6 +1722,7 @@
      }
  
      private void releasePlayer() {
@@ -2867,7 +2886,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
          if (player != null) {
              if(playbackServiceBinder != null) {
                  playbackServiceBinder.getService().unregisterPlayer(player);
-@@ -1298,14 +1793,14 @@
+@@ -1298,14 +1802,14 @@
                      // Lower the volume
                      if (!view.muted) {
                          activity.runOnUiThread(() ->
@@ -2884,7 +2903,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                          );
                      }
                  }
-@@ -1586,7 +2081,17 @@
+@@ -1586,7 +2090,17 @@
      }
  
      private ArrayList<VideoTrack> getVideoTrackInfo() {
@@ -2903,7 +2922,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
          if (trackSelector == null) {
              // Likely player is unmounting so no video tracks are available anymore
              return videoTracks;
-@@ -1610,6 +2115,72 @@
+@@ -1610,6 +2124,72 @@
              }
          }
          return videoTracks;
@@ -2976,7 +2995,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
      }
  
      private ArrayList<VideoTrack> getVideoTrackInfoFromManifest() {
-@@ -1703,7 +2274,7 @@
+@@ -1703,7 +2283,7 @@
          }
          
          TrackSelectionArray selectionArray = player.getCurrentTrackSelections();
@@ -2985,7 +3004,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
          TrackGroupArray groups = info.getTrackGroups(index);
  
          for (int groupIndex = 0; groupIndex < groups.length; ++groupIndex) {
-@@ -1861,6 +2432,9 @@
+@@ -1861,6 +2441,9 @@
  
      @Override
      public void onTracksChanged(@NonNull Tracks tracks) {
@@ -2995,7 +3014,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
          DebugLog.d(TAG, "onTracksChanged called - updating track information, controls=" + controls);
          
          if (controls) {
-@@ -1889,6 +2463,13 @@
+@@ -1889,6 +2472,13 @@
          
          updateSubtitleButtonVisibility();
      }
@@ -3009,34 +3028,43 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
      
      
      private boolean hasBuiltInTextTracks() {
-@@ -1950,10 +2531,62 @@
+@@ -1950,10 +2540,71 @@
          }
      }
  
 +    private boolean recoverFromVideoDecoderFailure(PlaybackException error) {
-+        if (player == null || recoveryVideoDecoderSoftware != null
++        if (player == null || failedVideoDecoders.size() >= 3
 +                || !(error instanceof androidx.media3.exoplayer.ExoPlaybackException)) return false;
-+        if (error.errorCode != PlaybackException.ERROR_CODE_DECODER_INIT_FAILED
++        androidx.media3.exoplayer.mediacodec.MediaCodecDecoderException codecFailure = null;
++        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
++            if (cause instanceof androidx.media3.exoplayer.mediacodec.MediaCodecDecoderException) {
++                codecFailure = (androidx.media3.exoplayer.mediacodec.MediaCodecDecoderException) cause;
++                break;
++            }
++        }
++        if (codecFailure == null && error.errorCode != PlaybackException.ERROR_CODE_DECODER_INIT_FAILED
 +                && error.errorCode != PlaybackException.ERROR_CODE_DECODING_FAILED
 +                && error.errorCode != PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES
 +                && error.errorCode != PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED) return false;
 +        Format format = ((androidx.media3.exoplayer.ExoPlaybackException) error).rendererFormat;
 +        // Audio, network and file errors must keep their existing recovery paths.
 +        if (format == null || format.sampleMimeType == null || !format.sampleMimeType.startsWith("video/")) return false;
-+        boolean failedSoftware = activeVideoDecoderName.isEmpty() ? softwareVideoDecoder : activeVideoDecoderSoftware;
-+        boolean fallbackSoftware = !failedSoftware;
-+        if (fallbackSoftware && format.drmInitData != null) return false;
++        String failedName = codecFailure != null && codecFailure.codecInfo != null
++                ? codecFailure.codecInfo.name : activeVideoDecoderName;
++        // Never retry an unidentified decoder or return to one which already failed.
++        if (failedName.isEmpty() || !failedVideoDecoders.add(failedName)) return false;
++        MediaCodecInfo fallback = null;
 +        try {
-+            boolean supported = false;
 +            for (MediaCodecInfo info : MediaCodecUtil.getDecoderInfos(format.sampleMimeType, format.drmInitData != null, false)) {
-+                if ((fallbackSoftware ? info.softwareOnly : info.hardwareAccelerated) && info.isFormatSupported(format)) {
-+                    supported = true;
++                if (!failedVideoDecoders.contains(info.name) && info.isFormatSupported(format)) {
++                    fallback = info;
 +                    break;
 +                }
 +            }
-+            if (!supported) return false;
++            if (fallback == null) return false;
 +        } catch (MediaCodecUtil.DecoderQueryException ignored) { return false; }
-+        recoveryVideoDecoderSoftware = fallbackSoftware; // At most one mode fallback per source/manual attempt.
++        boolean fallbackSoftware = fallback.softwareOnly;
++        recoveryVideoDecoderSoftware = fallbackSoftware;
 +        decoderSwitchFormat = format;
 +        WritableMap event = Arguments.createMap();
 +        com.facebook.react.bridge.WritableArray tags = Arguments.createArray();
@@ -3072,7 +3100,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
          switch(e.errorCode) {
              case PlaybackException.ERROR_CODE_DRM_DEVICE_REVOKED:
              case PlaybackException.ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED:
-@@ -2031,6 +2664,9 @@
+@@ -2031,6 +2682,9 @@
      }
  
      public void onCues(CueGroup cueGroup) {
@@ -3082,16 +3110,17 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
          if (!cueGroup.cues.isEmpty() && cueGroup.cues.get(0).text != null) {
              String subtitleText = cueGroup.cues.get(0).text.toString();
              eventEmitter.onTextTrackDataChanged.invoke(subtitleText);
-@@ -2061,6 +2697,8 @@
+@@ -2061,6 +2715,9 @@
              }
  
              if (!isSourceEqual) {
 +                recoveryVideoDecoderSoftware = null;
++                failedVideoDecoders.clear();
 +                decoderSwitchFormat = null;
                  hasVideoEnded = false;
                  playerNeedsSource = true;
                  initializePlayer();
-@@ -2147,6 +2785,12 @@
+@@ -2147,6 +2804,12 @@
                      TrackGroupArray groups = info.getTrackGroups(textRendererIndex);
                      boolean trackFound = false;
                      
@@ -3104,7 +3133,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                      for (int groupIndex = 0; groupIndex < groups.length; groupIndex++) {
                          TrackGroup group = groups.get(groupIndex);
                          for (int trackIndex = 0; trackIndex < group.length; trackIndex++) {
-@@ -2159,18 +2803,21 @@
+@@ -2159,18 +2822,21 @@
                                  isMatch = true;
                              } else if ("index".equals(type)) {
                                  int targetIndex = ReactBridgeUtils.safeParseInt(value, -1);
@@ -3127,7 +3156,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                          }
                          if (trackFound) break;
                      }
-@@ -2178,13 +2825,17 @@
+@@ -2178,13 +2844,17 @@
                      if (!trackFound) {
                          DebugLog.w(TAG, "Text track not found for type=" + type + ", value=" + value + 
                              ". Keeping current selection.");
@@ -3146,7 +3175,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
              
              // Give PlayerView time to update its controls
              mainHandler.postDelayed(() -> {
-@@ -2197,18 +2848,121 @@
+@@ -2197,18 +2867,121 @@
          }
      }
  
@@ -3271,7 +3300,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
          MappingTrackSelector.MappedTrackInfo info = trackSelector.getCurrentMappedTrackInfo();
          if (info == null) {
              return;
-@@ -2317,6 +3071,15 @@
+@@ -2317,6 +3090,15 @@
              groupIndex = getGroupIndexForDefaultLocale(groups);
          }
  
@@ -3287,7 +3316,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
          if (groupIndex == C.INDEX_UNSET && trackType == C.TRACK_TYPE_VIDEO && groups.length != 0) { // Video auto
              // Add all tracks as valid options for ABR to choose from
              TrackGroup group = groups.get(0);
-@@ -2359,7 +3122,7 @@
+@@ -2359,7 +3141,7 @@
              DefaultTrackSelector.Parameters.Builder selectionParameters = trackSelector.getParameters()
                      .buildUpon()
                      .setExceedAudioConstraintsIfNecessary(true)
@@ -3296,7 +3325,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
                      .setExceedVideoConstraintsIfNecessary(true)
                      .setRendererDisabled(rendererIndex, false);
  
-@@ -2429,10 +3192,225 @@
+@@ -2429,10 +3211,225 @@
          return groupIndex;
      }
  
@@ -3523,7 +3552,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
      }
  
      public void setSelectedAudioTrack(String type, String value) {
-@@ -2546,9 +3524,7 @@
+@@ -2546,9 +3543,7 @@
  
      public void setMutedModifier(boolean muted) {
          this.muted = muted;
@@ -3534,7 +3563,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
      }
  
      private void changeAudioOutput(AudioOutput output) {
-@@ -2577,9 +3553,14 @@
+@@ -2577,9 +3572,14 @@
      }
  
      public void setVolumeModifier(float volume) {
@@ -3551,7 +3580,7 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
          }
      }
  
-@@ -2587,6 +3568,51 @@
+@@ -2587,6 +3587,51 @@
          if (player != null) {
              player.seekTo(positionMs);
          }
@@ -3604,10 +3633,9 @@ diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatn
  
      public void setRateModifier(float newRate) {
 diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerViewManager.kt b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerViewManager.kt
-index b9e0656..5e07cce 100644
 --- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerViewManager.kt
 +++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerViewManager.kt
-@@ -41,6 +41,8 @@ class ReactExoplayerViewManager(private val config: ReactExoplayerConfig) : View
+@@ -41,6 +41,8 @@
          private const val PROP_PROGRESS_UPDATE_INTERVAL = "progressUpdateInterval"
          private const val PROP_REPORT_BANDWIDTH = "reportBandwidth"
          private const val PROP_RATE = "rate"
@@ -3616,10 +3644,20 @@ index b9e0656..5e07cce 100644
          private const val PROP_MAXIMUM_BIT_RATE = "maxBitRate"
          private const val PROP_PLAY_IN_BACKGROUND = "playInBackground"
          private const val PROP_DISABLE_FOCUS = "disableFocus"
-@@ -185,6 +187,16 @@ class ReactExoplayerViewManager(private val config: ReactExoplayerConfig) : View
-         videoView.setRateModifier(rate)
+@@ -180,9 +182,24 @@
+         videoView.setReportBandwidth(reportBandwidth)
      }
  
++    @ReactProp(name = "videoZoom", defaultFloat = 1f)
++    fun setVideoZoom(videoView: ReactExoplayerView, zoom: Float) {
++        videoView.setVideoZoom(zoom)
++    }
++
+     @ReactProp(name = PROP_RATE)
+     fun setRate(videoView: ReactExoplayerView, rate: Float) {
+         videoView.setRateModifier(rate)
++    }
++
 +    @ReactProp(name = PROP_SUBTITLE_DELAY_MS, defaultInt = 0)
 +    fun setSubtitleDelayMs(videoView: ReactExoplayerView, delayMs: Int) {
 +        videoView.setSubtitleDelayMs(delayMs)
@@ -3628,11 +3666,9 @@ index b9e0656..5e07cce 100644
 +    @ReactProp(name = PROP_AUDIO_DELAY_MS, defaultInt = 0)
 +    fun setAudioDelayMs(videoView: ReactExoplayerView, delayMs: Int) {
 +        videoView.setAudioDelayMs(delayMs)
-+    }
-+
+     }
+ 
      @ReactProp(name = PROP_MAXIMUM_BIT_RATE)
-     fun setMaxBitRate(videoView: ReactExoplayerView, maxBitRate: Float) {
-         videoView.setMaxBitRateModifier(maxBitRate.toInt())
 diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/VolumeBoostAudioProcessor.java b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/VolumeBoostAudioProcessor.java
 new file mode 100644
 index 0000000..14bff12
@@ -3678,10 +3714,9 @@ index 0000000..14bff12
 +    }
 +}
 diff --git a/node_modules/react-native-video/lib/specs/VideoNativeComponent.d.ts b/node_modules/react-native-video/lib/specs/VideoNativeComponent.d.ts
-index 76a0224..e57e99e 100644
 --- a/node_modules/react-native-video/lib/specs/VideoNativeComponent.d.ts
 +++ b/node_modules/react-native-video/lib/specs/VideoNativeComponent.d.ts
-@@ -105,6 +105,8 @@ type BufferConfig = Readonly<{
+@@ -105,6 +105,8 @@
      bufferForPlaybackAfterRebufferMs?: Float;
      maxHeapAllocationPercent?: Float;
      backBufferDurationMs?: Float;
@@ -3690,7 +3725,7 @@ index 76a0224..e57e99e 100644
      minBackBufferMemoryReservePercent?: Float;
      minBufferMemoryReservePercent?: Float;
      cacheSizeMB?: Float;
-@@ -306,6 +308,8 @@ export interface VideoNativeProps extends ViewProps {
+@@ -306,6 +308,8 @@
      ignoreSilentSwitch?: WithDefault<string, 'inherit'>;
      mixWithOthers?: WithDefault<string, 'inherit'>;
      rate?: Float;
@@ -3699,11 +3734,18 @@ index 76a0224..e57e99e 100644
      fullscreen?: boolean;
      fullscreenAutorotate?: boolean;
      fullscreenOrientation?: WithDefault<string, 'all'>;
+@@ -319,6 +323,7 @@
+     hideShutterView?: boolean;
+     reportBandwidth?: boolean;
+     subtitleStyle?: SubtitleStyle;
++  videoZoom?: Float; // android: video-only scale; subtitles remain fixed
+     viewType?: Int32;
+     bufferingStrategy?: BufferingStrategyType;
+     controlsStyles?: ControlsStyles;
 diff --git a/node_modules/react-native-video/lib/types/video.d.ts b/node_modules/react-native-video/lib/types/video.d.ts
-index 67a9d63..6861f68 100644
 --- a/node_modules/react-native-video/lib/types/video.d.ts
 +++ b/node_modules/react-native-video/lib/types/video.d.ts
-@@ -130,6 +130,8 @@ export type BufferConfig = {
+@@ -130,6 +130,8 @@
      bufferForPlaybackMs?: number;
      bufferForPlaybackAfterRebufferMs?: number;
      backBufferDurationMs?: number;
@@ -3712,7 +3754,7 @@ index 67a9d63..6861f68 100644
      maxHeapAllocationPercent?: number;
      minBackBufferMemoryReservePercent?: number;
      minBufferMemoryReservePercent?: number;
-@@ -284,6 +286,8 @@ export interface ReactVideoProps extends ReactVideoEvents, ViewProps {
+@@ -284,6 +286,8 @@
      preventsDisplaySleepDuringVideoPlayback?: boolean;
      progressUpdateInterval?: number;
      rate?: number;
@@ -3721,11 +3763,18 @@ index 67a9d63..6861f68 100644
      renderLoader?: ReactNode | ((arg0: ReactVideoRenderLoaderProps) => ReactNode);
      repeat?: boolean;
      reportBandwidth?: boolean;
+@@ -293,6 +297,7 @@
+     selectedTextTrack?: SelectedTrack;
+     selectedVideoTrack?: SelectedVideoTrack;
+     subtitleStyle?: SubtitleStyle;
++  videoZoom?: number; // android: video-only scale; subtitles remain fixed
+     shutterColor?: string;
+     /** @deprecated Use source.textTracks */
+     textTracks?: TextTracks;
 diff --git a/node_modules/react-native-video/src/specs/VideoNativeComponent.ts b/node_modules/react-native-video/src/specs/VideoNativeComponent.ts
-index 3dcbe01..d87bf11 100644
 --- a/node_modules/react-native-video/src/specs/VideoNativeComponent.ts
 +++ b/node_modules/react-native-video/src/specs/VideoNativeComponent.ts
-@@ -138,6 +138,8 @@ type BufferConfig = Readonly<{
+@@ -138,6 +138,8 @@
    bufferForPlaybackAfterRebufferMs?: Float;
    maxHeapAllocationPercent?: Float;
    backBufferDurationMs?: Float; // Android
@@ -3734,7 +3783,7 @@ index 3dcbe01..d87bf11 100644
    minBackBufferMemoryReservePercent?: Float;
    minBufferMemoryReservePercent?: Float;
    cacheSizeMB?: Float;
-@@ -362,6 +364,8 @@ export interface VideoNativeProps extends ViewProps {
+@@ -362,6 +364,8 @@
    ignoreSilentSwitch?: WithDefault<string, 'inherit'>; // ios, 'inherit'
    mixWithOthers?: WithDefault<string, 'inherit'>; // ios, 'inherit'
    rate?: Float;
@@ -3743,11 +3792,18 @@ index 3dcbe01..d87bf11 100644
    fullscreen?: boolean; // ios, false
    fullscreenAutorotate?: boolean;
    fullscreenOrientation?: WithDefault<string, 'all'>;
+@@ -375,6 +379,7 @@
+   hideShutterView?: boolean; //	Android
+   reportBandwidth?: boolean; //Android
+   subtitleStyle?: SubtitleStyle; // android
++  videoZoom?: WithDefault<Float, 1>; // android: video-only scale; subtitles remain fixed
+   viewType?: Int32; // Android
+   bufferingStrategy?: BufferingStrategyType; // Android
+   controlsStyles?: ControlsStyles; // Android
 diff --git a/node_modules/react-native-video/src/types/video.ts b/node_modules/react-native-video/src/types/video.ts
-index 0482944..c99a9e1 100644
 --- a/node_modules/react-native-video/src/types/video.ts
 +++ b/node_modules/react-native-video/src/types/video.ts
-@@ -176,6 +176,8 @@ export type BufferConfig = {
+@@ -176,6 +176,8 @@
    bufferForPlaybackMs?: number;
    bufferForPlaybackAfterRebufferMs?: number;
    backBufferDurationMs?: number; // Android
@@ -3756,7 +3812,7 @@ index 0482944..c99a9e1 100644
    maxHeapAllocationPercent?: number;
    minBackBufferMemoryReservePercent?: number;
    minBufferMemoryReservePercent?: number;
-@@ -360,6 +362,8 @@ export interface ReactVideoProps extends ReactVideoEvents, ViewProps {
+@@ -360,6 +362,8 @@
    preventsDisplaySleepDuringVideoPlayback?: boolean;
    progressUpdateInterval?: number;
    rate?: number;
@@ -3765,6 +3821,14 @@ index 0482944..c99a9e1 100644
    renderLoader?: ReactNode | ((arg0: ReactVideoRenderLoaderProps) => ReactNode);
    repeat?: boolean;
    reportBandwidth?: boolean; //Android
+@@ -369,6 +373,7 @@
+   selectedTextTrack?: SelectedTrack;
+   selectedVideoTrack?: SelectedVideoTrack; // android
+   subtitleStyle?: SubtitleStyle; // android
++  videoZoom?: number; // android: video-only scale; subtitles remain fixed
+   shutterColor?: string; // Android
+   /** @deprecated Use source.textTracks */
+   textTracks?: TextTracks;
 diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/VideoPlaybackService.kt b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/VideoPlaybackService.kt
 --- a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/VideoPlaybackService.kt
 +++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/VideoPlaybackService.kt
@@ -3913,6 +3977,110 @@ new file mode 100644
 +            // Do not include data URIs or signed URLs in the error/log.
 +            throw ParserException.createForMalformedManifest(
 +                    "Unsupported opaque HLS playlist URI; try another server", null);
++        }
++    }
++}
+diff --git a/node_modules/react-native-video/src/Video.tsx b/node_modules/react-native-video/src/Video.tsx
+--- a/node_modules/react-native-video/src/Video.tsx
++++ b/node_modules/react-native-video/src/Video.tsx
+@@ -732,6 +732,7 @@
+     useImperativeHandle(
+       ref,
+       () => ({
++        getAnimatableRef: () => nativeRef.current,
+         seek,
+         presentFullscreenPlayer,
+         dismissFullscreenPlayer,
+diff --git a/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/RecoveringMatroskaExtractor.java b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/RecoveringMatroskaExtractor.java
+new file mode 100644
+--- /dev/null
++++ b/node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/RecoveringMatroskaExtractor.java
+@@ -0,0 +1,88 @@
++package com.brentvatne.exoplayer;
++
++import android.net.Uri;
++import android.util.Log;
++import androidx.media3.common.ParserException;
++import androidx.media3.extractor.*;
++import androidx.media3.extractor.mkv.MatroskaExtractor;
++import java.io.IOException;
++import java.util.List;
++import java.util.Map;
++
++/** Recover only the known invalid EBML marker failure; never restart the network source. */
++final class RecoveringMatroskaExtractor implements Extractor {
++    private static final int MAX_SCAN = 1024 * 1024;
++    private static final int MAX_RECOVERIES = 8;
++    private final Extractor delegate;
++    private final byte[] marker = new byte[5];
++    private int recoveries;
++
++    RecoveringMatroskaExtractor(Extractor delegate) { this.delegate = delegate; }
++    @Override public boolean sniff(ExtractorInput input) throws IOException { return delegate.sniff(input); }
++    @Override public void init(ExtractorOutput output) { delegate.init(output); }
++    @Override public void seek(long position, long timeUs) { recoveries = 0; delegate.seek(position, timeUs); }
++    @Override public void release() { delegate.release(); }
++    @Override public Extractor getUnderlyingImplementation() { return delegate.getUnderlyingImplementation(); }
++
++    @Override public int read(ExtractorInput input, PositionHolder seekPosition) throws IOException {
++        try {
++            return delegate.read(input, seekPosition);
++        } catch (IllegalStateException error) {
++            if (!"No valid varint length mask found".equals(error.getMessage())) throw error;
++            if (++recoveries > MAX_RECOVERIES) throw malformed(error);
++            // Look for the next Cluster ID with a valid size marker. Peeking leaves
++            // its header unread, so the normal extractor still parses/validates it.
++            // Bounded work, constant memory; EOF is accepted only when actually reached.
++            for (int scanned = 0; scanned < MAX_SCAN; scanned++) {
++                input.resetPeekPosition();
++                if (!input.peekFully(marker, 0, 1, true)) {
++                    Log.w("VegaMatroska", "Reached EOF after invalid MKV marker");
++                    return RESULT_END_OF_INPUT;
++                }
++                if ((marker[0] & 255) == 0x1F) {
++                    try {
++                        input.peekFully(marker, 1, 4);
++                        if ((marker[1] & 255) == 0x43 && (marker[2] & 255) == 0xB6 &&
++                                (marker[3] & 255) == 0x75 && marker[4] != 0) {
++                            input.resetPeekPosition();
++                            delegate.seek(input.getPosition(), 0);
++                            Log.w("VegaMatroska", "Resynchronized MKV at " + input.getPosition());
++                            return RESULT_CONTINUE;
++                        }
++                    } catch (java.io.EOFException end) {
++                        // Not enough bytes for another Cluster. Consume through actual EOF.
++                    }
++                }
++                input.resetPeekPosition();
++                input.skipFully(1);
++            }
++            throw malformed(error);
++        }
++    }
++    private static ParserException malformed(Exception cause) {
++        return ParserException.createForMalformedContainer("Unable to resynchronize invalid MKV element", cause);
++    }
++
++    static final class Factory implements ExtractorsFactory {
++        private final ExtractorsFactory delegate = new DefaultExtractorsFactory();
++        @Override public ExtractorsFactory setSubtitleParserFactory(androidx.media3.extractor.text.SubtitleParser.Factory factory) {
++            delegate.setSubtitleParserFactory(factory); return this;
++        }
++        @Override public ExtractorsFactory experimentalSetTextTrackTranscodingEnabled(boolean enabled) {
++            delegate.experimentalSetTextTrackTranscodingEnabled(enabled); return this;
++        }
++        @Override public ExtractorsFactory experimentalSetCodecsToParseWithinGopSampleDependencies(int codecs) {
++            delegate.experimentalSetCodecsToParseWithinGopSampleDependencies(codecs); return this;
++        }
++        @Override public Extractor[] createExtractors() { return wrap(delegate.createExtractors()); }
++        @Override public Extractor[] createExtractors(Uri uri, Map<String, List<String>> headers) {
++            return wrap(delegate.createExtractors(uri, headers));
++        }
++        private Extractor[] wrap(Extractor[] extractors) {
++            for (int i = 0; i < extractors.length; i++) {
++                if (extractors[i] instanceof MatroskaExtractor) extractors[i] = new RecoveringMatroskaExtractor(extractors[i]);
++            }
++            return extractors;
 +        }
 +    }
 +}

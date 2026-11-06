@@ -38,14 +38,17 @@ import {_onBack} from './utils';
 import {_styles} from './styles';
 import type {VideoPlayerProps, WithRequiredProperty} from './types';
 import Gestures from './components/Gestures';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import Animated, {
   useAnimatedStyle,
+  useAnimatedProps,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
 
 const volumeWidth = 150;
 const iconOffset = 0;
+const AnimatedVideo = Animated.createAnimatedComponent(Video);
 
 const AnimatedVideoPlayer = (
   props: WithRequiredProperty<VideoPlayerProps, 'animations'>,
@@ -169,8 +172,11 @@ const AnimatedVideoPlayer = (
     isFullscreen || resizeMode === 'cover' || false,
   );
   const [_playbackRate, setPlaybackRate] = useState<number>(rate);
-  const [_showTimeRemaining, setShowTimeRemaining] =
-    useState<boolean>(showTimeRemaining);
+  const [_showTimeRemaining, setShowTimeRemaining] = useState<boolean>(() =>
+    props.showTimeRemaining !== undefined
+      ? showTimeRemaining
+      : settingsStorage.isShowTimeRemaining(),
+  );
   const [volumeTrackWidth, setVolumeTrackWidth] = useState<number>(0);
   const [volumeFillWidth, setVolumeFillWidth] = useState<number>(0);
   const [seekerFillWidth, setSeekerFillWidth] = useState<number>(0);
@@ -202,6 +208,14 @@ const AnimatedVideoPlayer = (
   const zoomStartScale = useSharedValue(1);
 
   const zoomAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{scale: Platform.OS === 'android' ? 1 : zoomScale.value}],
+  }));
+  const videoZoomProps = useAnimatedProps(() => ({
+    videoZoom: zoomScale.value,
+  }));
+  // Ambient bars use the original fitted bounds. Transform them with the
+  // video so their opaque fill cannot cover the expanded picture.
+  const ambientZoomAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{scale: zoomScale.value}],
   }));
 
@@ -273,10 +287,19 @@ const AnimatedVideoPlayer = (
     () => setShowControls((prevState) => alwaysShowControls || !prevState),
     [alwaysShowControls],
   );
-  const toggleTimer = useCallback(
-    () => setShowTimeRemaining((prevState) => !prevState),
-    [],
-  );
+  const toggleTimer = useCallback(() => {
+    setShowTimeRemaining((prevState) => {
+      const next = !prevState;
+      settingsStorage.setShowTimeRemaining(next);
+      if (settingsStorage.isHapticFeedbackEnabled()) {
+        ReactNativeHapticFeedback.trigger('selection', {
+          enableVibrateFallback: true,
+          ignoreAndroidSystemSettings: false,
+        });
+      }
+      return next;
+    });
+  }, []);
   const togglePlayPause = useCallback(() => {
     setPaused((prevState) => !prevState);
   }, []);
@@ -1015,10 +1038,11 @@ const AnimatedVideoPlayer = (
           ref={ambientView} collapsable={false}
           pointerEvents="none"
           style={[_styles.player.video, zoomAnimatedStyle]}>
-          <Video
+          <AnimatedVideo
             controls={false}
             {...props}
             {...events}
+            animatedProps={Platform.OS === 'android' ? videoZoomProps : undefined}
             ref={videoRef || _videoRef}
             resizeMode={resizeMode}
             volume={_volume * (volumeBoostAvailable ? volumeBoost : 1)}
@@ -1034,8 +1058,10 @@ const AnimatedVideoPlayer = (
             viewType={Platform.OS === 'android' ? ViewType.SURFACE : props.viewType}
           />
           {Platform.OS === 'android' && ambientConfig.enabled && !ambientDisabled && !ambientPip && sourceUri && (
-            <AmbientBackground key={String(sourceUri)} videoView={ambientView} bars={ambientBars}
-              paused={_paused || playbackSuspended || loading || buffering} intensity={ambientConfig.intensity} spread={ambientConfig.spread} responseMs={ambientConfig.responseMs} />
+            <Animated.View pointerEvents="none" style={[_styles.player.video, ambientZoomAnimatedStyle]}>
+              <AmbientBackground key={String(sourceUri)} videoView={ambientView} bars={ambientBars}
+                paused={_paused || playbackSuspended || loading || buffering} intensity={ambientConfig.intensity} spread={ambientConfig.spread} responseMs={ambientConfig.responseMs} />
+            </Animated.View>
           )}
         </Animated.View>
         {!hideAllControlls && !disableOverlay && <Overlay animations={animations} />}

@@ -1,3 +1,4 @@
+import {ProviderVersionMismatchError, validateProviderModuleVersion, validateProviderModuleSet} from './providerVersion';
 import axios from 'axios';
 import {
   extensionStorage,
@@ -6,8 +7,6 @@ import {
   ProviderSource,
 } from '../storage/extensionStorage';
 import {mainStorage} from '../storage/StorageService';
-import useContentStore from '../zustand/contentStore';
-import {getRemoteAdminConfig} from './remoteAdmin';
 import {
   getSourceAuthHeaders,
   sourceTokenStorage,
@@ -55,12 +54,20 @@ export const throwIfRateLimited = (error: unknown): void => {
 /**
  * Extension manager service for handling dynamic provider loading
  */
+const isNewerInstalledVersion = (installed: string, requested: string): boolean => {
+  const current = installed.split('.').map(part => parseInt(part, 10) || 0);
+  const next = requested.split('.').map(part => parseInt(part, 10) || 0);
+  for (let i = 0; i < Math.max(current.length, next.length); i++) {
+    if ((current[i] || 0) !== (next[i] || 0)) return (current[i] || 0) > (next[i] || 0);
+  }
+  return false;
+};
+
 export class ExtensionManager {
   private static instance: ExtensionManager;
   private readonly legacyCustomProviderBaseUrlKey = 'customProviderBaseUrl';
 
   private testMode = false;
-  private autoInstallStarted = false;
   private baseUrlTestMode = '';
 
   private getManifest = (url: string) => {
@@ -206,7 +213,7 @@ export class ExtensionManager {
         )
         .map((item: any) => ({
           value: item.value,
-          display_name: String(item.display_name || item.name || item.title || item.value),
+          display_name: item.display_name,
           disabled: item.disabled || false,
           source: {author: activeSource.author, url: activeSource.url},
           version: item.version,
@@ -261,21 +268,31 @@ export class ExtensionManager {
       const modules: Record<string, string> = {};
       const downloadPromises = allFiles.map(async fileName => {
         try {
-          const url = `${filesUrl}/${fileName}.js?t=${Date.now()}`;
-          console.log(`Downloading: ${url}`);
+          // Retry a stale CDN body once with a fresh cache key; never commit a partial set.
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              const url = `${filesUrl}/${fileName}.js?v=${encodeURIComponent(version)}&t=${Date.now()}-${attempt}`;
+              console.log(`Downloading: ${url}`);
 
-          const response = await axios.get(url, {
-            timeout: 15000,
-            headers: {
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              Pragma: 'no-cache',
-              Expires: '0',
-              ...getSourceAuthHeaders(sourceAuthor, url),
-            },
-          });
+              const response = await axios.get(url, {
+                timeout: 15000,
+                headers: {
+                  'Cache-Control': 'no-cache, no-store, must-revalidate',
+                  Pragma: 'no-cache',
+                  Expires: '0',
+                  ...getSourceAuthHeaders(sourceAuthor, url),
+                },
+              });
 
-          if (response.data) {
-            modules[fileName] = response.data;
+              if (typeof response.data !== 'string' || !response.data.trim()) {
+                throw new Error(`Invalid module response: ${fileName}.js`);
+              }
+              validateProviderModuleVersion(response.data, providerValue, version, fileName);
+              modules[fileName] = response.data;
+              break;
+            } catch (error) {
+              if (!(error instanceof ProviderVersionMismatchError) || attempt === 1) throw error;
+            }
           }
         } catch (error) {
           if (requiredFiles.includes(fileName)) {
@@ -289,6 +306,8 @@ export class ExtensionManager {
             );
             throw error;
           } else {
+            const status = (error as {response?: {status?: number}})?.response?.status;
+            if (status !== 404 && status !== 410) throw error;
             console.warn(
               `Optional file ${fileName}.js not found for ${providerValue}`,
             );
@@ -297,6 +316,7 @@ export class ExtensionManager {
       });
 
       await Promise.all(downloadPromises);
+      validateProviderModuleSet(modules, providerValue, version);
 
       // Verify required files were downloaded
       const missingRequired = requiredFiles.filter(file => !modules[file]);
@@ -465,6 +485,12 @@ export class ExtensionManager {
         return false;
       }
 
+      // A newer manual/automatic update may have finished while this download ran.
+      // The check and synchronous commit share one JS turn, so stale code cannot win.
+      const latest = extensionStorage.getInstalledProviders().find(
+        item => item.value === provider.value && item.source?.author === provider.source.author,
+      );
+      if (latest && isNewerInstalledVersion(latest.version, provider.version)) return false;
       // Recheck immediately before committing code and version together.
       if (!shouldApply()) return false;
       extensionStorage.cacheProviderModules(downloaded);
@@ -527,23 +553,8 @@ export class ExtensionManager {
     try {
       this.migrateLegacyCustomProviderSource();
 
-      // Keep the AnimePlex provider repository available and make it the default source.
-      const defaultSource = createProviderSource(
-        'https://github.com/sachinqzqz-web/vega-providers',
-      );
-      const savedDefaultSource = extensionStorage
-        .getProviderSources()
-        .find(item => item.author === defaultSource.author);
-      if (!savedDefaultSource) {
-        extensionStorage.addProviderSources(
-          defaultSource.author,
-          defaultSource.url,
-          defaultSource.manifestUrl,
-        );
-      }
-      extensionStorage.setDefaultProviderSource(defaultSource.author);
-      const source = extensionStorage.getProviderSource();
-      if (!source) return;
+      // Load providers from cache
+      const source = this.getActiveSource();
       const installed = extensionStorage.getInstalledProviders();
       const available = source
         ? extensionStorage.getAvailableProviders(source.author)
@@ -565,118 +576,8 @@ export class ExtensionManager {
           console.warn('Failed to refresh manifest on startup:', error);
         }
       }
-
-      // Sync every enabled provider from the source manifest, including existing
-      // installs. This upgrades legacy generic names and fills providers missing
-      // from older app installs without reinstalling providers already present.
-      if (!this.autoInstallStarted) {
-        this.autoInstallStarted = true;
-        void this.autoInstallDefaultProviders(source);
-      }
     } catch (error) {
       console.error('Failed to initialize extension system:', error);
-    }
-  }
-
-  private async autoInstallDefaultProviders(source: ProviderSource): Promise<void> {
-    try {
-      const providers = await this.fetchManifest(source, false);
-      const existing = extensionStorage.getInstalledProviders();
-      const byValue = new Map(existing.map(provider => [provider.value, provider]));
-
-      // Refresh the canonical names/icons/types for already-installed providers.
-      // This fixes legacy entries that were all labelled "AnimePlex server N".
-      const refreshedInstalled = existing.map(installed => {
-        const latest = providers.find(provider => provider.value === installed.value);
-        if (!latest) return installed;
-        return {
-          ...installed,
-          display_name: latest.display_name,
-          icon: latest.icon,
-          type: latest.type,
-          disabled: latest.disabled,
-          version: latest.version,
-          hasSettings: latest.hasSettings,
-          path: latest.path,
-          source: latest.source,
-        };
-      });
-      extensionStorage.setInstalledProviders(refreshedInstalled);
-      useContentStore.getState().setInstalledProviders(refreshedInstalled);
-
-      const configuredDefault = String(
-        getRemoteAdminConfig()?.providers?.defaultProvider ?? '',
-      ).trim();
-      const normalizeProvider = (value: string) =>
-        value.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const defaultKey = normalizeProvider(configuredDefault);
-      const defaultAliases: Record<string, string[]> = {
-        moviebox: ['movieboxweb', 'moviebox', 'movieboxapp'],
-        movieboxweb: ['movieboxweb', 'moviebox', 'movieboxapp'],
-        movieboxapp: ['movieboxweb', 'moviebox', 'movieboxapp'],
-        primevideo: ['primevideo', 'primemirror', 'prime'],
-        prime: ['primevideo', 'primemirror', 'prime'],
-        disneyplus: ['disneyplus', 'disneymirror'],
-        netflix: ['netflix', 'netflixmirror'],
-      };
-      const defaultMatches = (provider: ProviderExtension) => {
-        const candidates = [
-          normalizeProvider(provider.value),
-          normalizeProvider(provider.display_name),
-        ];
-        const aliases = defaultAliases[defaultKey] || [defaultKey];
-        return !!defaultKey && candidates.some(candidate =>
-          candidate === defaultKey || aliases.includes(candidate),
-        );
-      };
-
-      // Install the admin-configured default first, then continue sequentially.
-      // This gets the primary provider ready before the rest of the catalog.
-      const orderedProviders = providers
-        .filter(provider => !provider.disabled && !byValue.has(provider.value))
-        .sort((left, right) => {
-          const leftIsDefault = defaultMatches(left);
-          const rightIsDefault = defaultMatches(right);
-          return Number(rightIsDefault) - Number(leftIsDefault);
-        });
-
-      // Sequential downloads protect low-memory phones. Install every enabled
-      // provider absent from an older install, continuing if an individual source fails.
-      for (const provider of orderedProviders) {
-        try {
-          await this.installProvider(provider);
-          const latestInstalled = extensionStorage.getInstalledProviders();
-          useContentStore.getState().setInstalledProviders(latestInstalled);
-
-          // Select the default as soon as its install completes, without waiting
-          // for the remaining providers to download.
-          const installedDefault = latestInstalled.find(defaultMatches);
-          const currentProvider = useContentStore.getState().provider;
-          if (installedDefault && !currentProvider.value) {
-            useContentStore.getState().setProvider(installedDefault);
-          }
-        } catch (error) {
-          console.warn('Skipping provider that failed to install:', provider.value, error);
-        }
-      }
-
-      const latestInstalled = extensionStorage.getInstalledProviders();
-      if (latestInstalled.length > 0) {
-        useContentStore.getState().setInstalledProviders(latestInstalled);
-        const current = useContentStore.getState().provider;
-        const refreshedCurrent = latestInstalled.find(item => item.value === current.value);
-        if (refreshedCurrent) {
-          useContentStore.getState().setProvider(refreshedCurrent);
-        } else if (!current.value) {
-          const movieBox = latestInstalled.find(
-            provider => provider.value.toLowerCase() === 'movieboxweb',
-          );
-          useContentStore.getState().setProvider(movieBox || latestInstalled[0]);
-        }
-      }
-    } catch (error) {
-      console.warn('Automatic provider setup failed; users can retry from Provider Manager:', error);
-      this.autoInstallStarted = false;
     }
   }
 

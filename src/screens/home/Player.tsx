@@ -1,3 +1,5 @@
+import {findSavedSubtitle, savedSubtitleLabel} from '../../lib/subtitles/savedSubtitles';
+import RemovableSubtitleRow from '../../components/RemovableSubtitleRow';
 import {getPlaybackQuality} from '../../lib/player/playbackQuality';
 import {localContentId} from '../../lib/localContent/library';
 import useLocalContentStore from '../../lib/zustand/localContentStore';
@@ -44,6 +46,7 @@ import {RootStackParamList} from '../../App';
 import {
   cacheStorage,
   settingsStorage,
+  watchProgressStorage,
 } from '../../lib/storage';
 import Orientation, {
   OrientationLocker,
@@ -97,6 +100,7 @@ import {
 import {syncFromSharedFolder} from '../../lib/sync/syncService';
 import {useM3Colors} from '../../theme/M3PaletteContext';
 import {useTVFocusBorderColor} from '../../lib/tv/useTVFocusBorderColor';
+import TVFocusPressable from '../../components/tv/TVFocusPressable';
 import useContinueWatchingStore from '../../lib/zustand/continueWatchingStore';
 import useLocalVideoStore from '../../lib/zustand/localVideoStore';
 import useDownloadsStore, {
@@ -150,11 +154,11 @@ import {
   shouldAutoPlayNext,
 } from '../../lib/player/autoNext';
 import {useSleepTimer} from '../../lib/hooks/useSleepTimer';
-import {sendViewerHeartbeat} from '../../lib/services/remoteAdmin';
 import {useNextEpisodePrefetch} from '../../lib/hooks/useNextEpisodePrefetch';
 
 import {
   NO_PLAYBACK_RETRY,
+  isContainerParsingError,
   decidePlaybackError,
   getReloadStartMs,
   markPlaybackLoaded,
@@ -166,22 +170,11 @@ const readCachedProgress = (link?: string) => {
   if (!link) {
     return {position: 0, duration: 0};
   }
-  try {
-    const cached = cacheStorage.getString(link);
-    if (!cached) {
-      return {position: 0, duration: 0};
-    }
-    const parsed = JSON.parse(cached) as {
-      position?: number;
-      duration?: number;
-    };
-    return {
-      position: parsed.position || 0,
-      duration: parsed.duration || 0,
-    };
-  } catch {
-    return {position: 0, duration: 0};
-  }
+  const progress = watchProgressStorage.getProgress(link);
+  return {
+    position: progress?.position || 0,
+    duration: progress?.duration || 0,
+  };
 };
 
 const getCachedSkips = (keys: (string | undefined)[]): SkipInterval[] => {
@@ -272,6 +265,7 @@ const formatTVTimelineTime = (time: number): string => {
 };
 
 const BOTTOM_CONTROL_ICON_COLOR = 'rgba(255,255,255,0.6)';
+const EditControlsButton = isTV ? TVFocusPressable : TouchableOpacity;
 /** "#RGB" / "#RRGGBB" / "#AARRGGBB" to Android "#AARRGGBB" with the given alpha. */
 const withAlpha = (hex: string, opacity: number) => {
   let rgb = hex.replace('#', '');
@@ -629,7 +623,7 @@ const Player = ({route}: Props): React.JSX.Element => {
   const [syncReady, setSyncReady] = useState(false);
 
   useEffect(() => {
-    if (route.params.localContent) {
+    if (route.params.localContent || !settingsStorage.isSyncEnabled()) {
       setSyncReady(true);
       return;
     }
@@ -868,7 +862,9 @@ const Player = ({route}: Props): React.JSX.Element => {
     selectedStream,
     setSelectedStream,
     externalSubs,
-    setExternalSubs,
+    savedSubtitles,
+    saveSubtitle,
+    removeSavedSubtitle,
     isLoading: streamLoading,
     error: streamError,
     refreshLinks,
@@ -889,41 +885,6 @@ const Player = ({route}: Props): React.JSX.Element => {
           Boolean((route.params as any)?.alwaysCast) ||
           settingsStorage.isAlwaysCastMode())),
   });
-
-  // Report real active playback to the AnimePlex admin dashboard. Telemetry is
-  // anonymous and best-effort; network errors never interrupt playback.
-  const adminPlaybackStartedAt = useRef(new Date().toISOString());
-  useEffect(() => {
-    adminPlaybackStartedAt.current = new Date().toISOString();
-  }, [activeEpisodeKey]);
-  useEffect(() => {
-    if (
-      route.params.localContent ||
-      !selectedStream?.link ||
-      !route.params.primaryTitle
-    ) {
-      return;
-    }
-    const report = () => {
-      void sendViewerHeartbeat({
-        title: String(route.params.primaryTitle || activeEpisode?.title || 'Unknown title'),
-        season: String(route.params.secondaryTitle || ''),
-        episode: String(activeEpisode?.title || ''),
-        platform: isTV ? 'android-tv' : 'android',
-        startedAt: adminPlaybackStartedAt.current,
-      });
-    };
-    report();
-    const interval = setInterval(report, 20_000);
-    return () => clearInterval(interval);
-  }, [
-    activeEpisode?.title,
-    activeEpisodeKey,
-    route.params.localContent,
-    route.params.primaryTitle,
-    route.params.secondaryTitle,
-    selectedStream?.link,
-  ]);
 
   // Custom hooks for video settings
   const {
@@ -1081,6 +1042,8 @@ const Player = ({route}: Props): React.JSX.Element => {
     null,
   );
   const videoSurfaceTVRef = useRef<View>(null);
+  const [topControlTVHandle, setTopControlTVHandle] = useState<number | null>(null);
+  const [bottomControlTVHandle, setBottomControlTVHandle] = useState<number | null>(null);
   const preferredMenuRowRef = useRef<View>(null);
   const [editingControls, setEditingControls] = useState(false);
   const [showMoreControls, setShowMoreControls] = useState(false);
@@ -1229,7 +1192,6 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   const {
     getTVFocusProps,
-    tvFocusedControl,
     showTVControls,
     scrubPosition,
     confirmScrub,
@@ -1249,6 +1211,22 @@ const Player = ({route}: Props): React.JSX.Element => {
     onSeekNotification: handleSeekNotification,
     remoteSuspended: autoNextVisible || editingControls || showMoreControls,
   });
+
+  const [showTimeRemaining, setShowTimeRemaining] = useState<boolean>(() =>
+    settingsStorage.isShowTimeRemaining(),
+  );
+
+  const handleTimelinePress = useCallback(() => {
+    if (scrubPosition !== null) {
+      confirmScrub();
+    } else {
+      setShowTimeRemaining(prev => {
+        const next = !prev;
+        settingsStorage.setShowTimeRemaining(next);
+        return next;
+      });
+    }
+  }, [scrubPosition, confirmScrub]);
 
   const currentEpisodeIndex = useMemo(() => {
     if (!route.params?.episodeList?.length || !activeEpisode) return -1;
@@ -1930,8 +1908,15 @@ const Player = ({route}: Props): React.JSX.Element => {
       console.log('PlayerError', e);
 
       if (route.params.localContent) {
-        ToastAndroid.show('Cannot play this local file. Check the file and reselect its folder if access was lost.', ToastAndroid.LONG);
+        ToastAndroid.show(isContainerParsingError(e)
+          ? 'Unable to read the video container.'
+          : 'Cannot play this local file. Check the file and reselect its folder if access was lost.', ToastAndroid.LONG);
         navigation.goBack();
+        return;
+      }
+
+      if ((selectedStreamRef.current?.type === 'local' || isLocalPath(selectedStreamRef.current?.link)) && isContainerParsingError(e)) {
+        ToastAndroid.show('Unable to read the video container. Your saved file was kept.', ToastAndroid.LONG);
         return;
       }
 
@@ -1978,13 +1963,13 @@ const Player = ({route}: Props): React.JSX.Element => {
               prev?.stream === stream ? prev.ms : undefined,
             ),
           }));
-          ToastAndroid.show('Connection lost, retrying', ToastAndroid.SHORT);
+          ToastAndroid.show('Playback interrupted, retrying', ToastAndroid.SHORT);
           return;
         }
         // The reload failed too, so the link has likely expired. Ask the
         // provider for new links once; the same server then continues from
         // where it stopped.
-        if (state.retried && linkRefreshRef.current !== stream) {
+        if (!isContainerParsingError(e) && state.retried && linkRefreshRef.current !== stream) {
           linkRefreshRef.current = stream;
           const episodeKey = activeEpisodeKeyRef.current;
           const pending = {stream, episodeKey};
@@ -2305,9 +2290,10 @@ const Player = ({route}: Props): React.JSX.Element => {
     (externalSubs || []).forEach((sub: any, i: number) => {
       if (sub?.uri) {
         allSubs.push({
-          id: `ext_${i}_${sub.uri}`,
+          id: sub.savedSubtitleId ? `saved_${sub.savedSubtitleId}` : `ext_${i}_${sub.uri}`,
+          savedSubtitleId: sub.savedSubtitleId,
           language: sub.language || 'und',
-          title: sub.title || sub.language || `Subtitle ${i + 1}`,
+          title: savedSubtitles.find(saved => saved.id === sub.savedSubtitleId)?.title || sub.title || sub.language || `Subtitle ${i + 1}`,
           uri: sub.uri,
           isEmbedded: false,
         });
@@ -2332,6 +2318,7 @@ const Player = ({route}: Props): React.JSX.Element => {
 
     if (Array.isArray(textTracks)) {
       textTracks.forEach((t: any, i: number) => {
+        if (findSavedSubtitle(t, savedSubtitles)) return;
         const lang = t.language && t.language !== 'und' ? t.language : '';
         allSubs.push({
           id: `track_${t.index ?? i}`,
@@ -2343,7 +2330,12 @@ const Player = ({route}: Props): React.JSX.Element => {
     }
 
     const currentSubs = useRemoteStore.getState().subtitleTracks;
-    if (
+    if (currentSubs.length > 0 && (allSubs.some(sub => sub.savedSubtitleId) || currentSubs.some(sub => sub.savedSubtitleId))) {
+      // Receivers keep track ordinals in already-issued URLs. Add cached tracks
+      // at the end and retain the active session's ordering when one is removed.
+      const additions = allSubs.filter(sub => sub.savedSubtitleId && !currentSubs.some(current => current.uri === sub.uri));
+      if (additions.length) useRemoteStore.getState().setSubtitleTracks([...currentSubs, ...additions]);
+    } else if (
       allSubs.length > 0 &&
       (currentSubs.length === 0 || allSubs.length >= currentSubs.length)
     ) {
@@ -2359,6 +2351,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     audioTracks,
     selectedAudioTrackIndex,
     externalSubs,
+    savedSubtitles,
     textTracks,
     selectedTextTrackIndex,
   ]);
@@ -2474,9 +2467,10 @@ const Player = ({route}: Props): React.JSX.Element => {
         externalSubs.forEach((sub: any, i: number) => {
           if (sub?.uri) {
             remoteSubtitles.push({
-              id: `ext_${i}_${sub.uri}`,
+              id: sub.savedSubtitleId ? `saved_${sub.savedSubtitleId}` : `ext_${i}_${sub.uri}`,
+              savedSubtitleId: sub.savedSubtitleId,
               language: sub.language || 'und',
-              title: sub.title || sub.language || `Subtitle ${i + 1}`,
+              title: savedSubtitles.find(saved => saved.id === sub.savedSubtitleId)?.title || sub.title || sub.language || `Subtitle ${i + 1}`,
               uri: sub.uri,
               isEmbedded: false,
             });
@@ -2769,57 +2763,20 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   // Set last selected audio and subtitle tracks
   useEffect(() => {
-    const savedAudioTrack = cacheStorage.getString('lastAudioTrack');
+    const lastAudioTrack = cacheStorage.getString('lastAudioTrack') || 'auto';
     const lastTextTrack = cacheStorage.getString('lastTextTrack') || 'auto';
 
     if (!hasSetInitialAudioRef.current && audioTracks.length > 0) {
       hasSetInitialAudioRef.current = true;
-      const hindiTrackIndex = audioTracks.findIndex(track => {
-        // Providers expose language metadata inconsistently: Hindi may appear
-        // as "hi"/"hin", "Hindi dub", or only in the track title/label.
-        const metadata = [
-          track.language,
-          track.title,
-          (track as any).name,
-          (track as any).label,
-          (track as any).displayName,
-        ]
-          .filter(Boolean)
-          .map(value => String(value).trim().toLowerCase());
-
-        return metadata.some(value =>
-          value === 'hi' ||
-          value === 'hin' ||
-          value === 'hindi' ||
-          value === 'hi-in' ||
-          value.startsWith('hi-') ||
-          /(^|[\s()[\]_-])hindi([\s()[\]_-]|$)/i.test(value) ||
-          /हिंदी/.test(value),
-        );
-      });
-      const savedTrackIndex = savedAudioTrack && savedAudioTrack !== 'auto'
-        ? audioTracks.findIndex(track => track.language === savedAudioTrack)
-        : -1;
-      // Hindi is the app's default whenever a Hindi dub exists. A previously
-      // saved Original/English choice must not override that default.
-      const audioTrackIndex = hindiTrackIndex !== -1
-        ? hindiTrackIndex
-        : savedTrackIndex !== -1
-          ? savedTrackIndex
-          : audioTracks.findIndex(track => track.language === 'auto');
+      const audioTrackIndex = audioTracks.findIndex(
+        track => track.language === lastAudioTrack,
+      );
       if (audioTrackIndex !== -1) {
-        // Select by the real media track index so the choice changes playback,
-        // not just the highlighted row in the Audio menu.
-        const selectedTrack = audioTracks[audioTrackIndex];
-        const selectedLanguage = String(selectedTrack?.language || '');
         setSelectedAudioTrack({
           type: SelectedTrackType.INDEX,
           value: audioTrackIndex,
         });
         setSelectedAudioTrackIndex(audioTrackIndex);
-        if (hindiTrackIndex !== -1 && selectedLanguage) {
-          cacheStorage.setString('lastAudioTrack', selectedLanguage);
-        }
       }
     }
 
@@ -2986,6 +2943,8 @@ const Player = ({route}: Props): React.JSX.Element => {
     (e: any) => {
       const tracks = e?.textTracks || [];
       setTextTracks(tracks);
+      const selectedSaved = tracks.find((track: any) => track.selected && track.title?.startsWith('vega-saved-subtitle:'));
+      if (selectedSaved) {setSelectedTextTrackIndex(selectedSaved.index); return;}
       if (selectedTextTrackIndexRef.current === 1000 && tracks.length > 0) {
         const downloadedTrack = tracks.find(
           (t: any) =>
@@ -3660,6 +3619,9 @@ const Player = ({route}: Props): React.JSX.Element => {
       {/* Local or Remote player */}
       {isRemoteActive ? (
         <RemotePlayerScreen
+          savedSubtitles={savedSubtitles}
+          onAddSavedSubtitle={saveSubtitle}
+          onRemoveSavedSubtitle={removeSavedSubtitle}
           title={route.params?.primaryTitle}
           subtitle={activeEpisode?.title || route.params?.secondaryTitle}
           poster={route.params?.poster?.poster}
@@ -3824,13 +3786,17 @@ const Player = ({route}: Props): React.JSX.Element => {
         !showEpisodeSidebar &&
         showControls && (
           <>
-            <Pressable
+            <TVFocusPressable
               ref={playPauseTVRef}
+              focusRadius={40 * controlStyle.scale}
+              focusWidth={3}
               onLayout={() =>
                 setPlayPauseTVHandle(findNodeHandle(playPauseTVRef.current))
               }
               nextFocusLeft={playPauseTVHandle ?? undefined}
               nextFocusRight={playPauseTVHandle ?? undefined}
+              nextFocusUp={topControlTVHandle ?? undefined}
+              nextFocusDown={timelineFocusHandle ?? undefined}
               accessibilityRole="button"
               accessibilityLabel={isPaused ? 'Play video' : 'Pause video'}
               hasTVPreferredFocus
@@ -3846,8 +3812,7 @@ const Player = ({route}: Props): React.JSX.Element => {
                 justifyContent: 'center',
                 borderRadius: 40 * controlStyle.scale,
                 borderWidth: 3,
-                borderColor:
-                  tvFocusedControl === 'play_pause' ? primary : 'transparent',
+                borderColor: 'transparent',
                 backgroundColor: 'rgba(0,0,0,0.45)',
                 zIndex: 65,
               }}>
@@ -3856,21 +3821,30 @@ const Player = ({route}: Props): React.JSX.Element => {
                 size={44 * controlStyle.scale}
                 color="white"
               />
-            </Pressable>
-            <Pressable
+            </TVFocusPressable>
+            <TVFocusPressable
               ref={timelineRef}
+              focusWidth={2}
               onLayout={() =>
                 setTimelineFocusHandle(findNodeHandle(timelineRef.current))
               }
               nextFocusLeft={timelineFocusHandle ?? undefined}
               nextFocusRight={timelineFocusHandle ?? undefined}
+              nextFocusUp={playPauseTVHandle ?? undefined}
+              nextFocusDown={bottomControlTVHandle ?? undefined}
               accessibilityRole="adjustable"
               accessibilityLabel="Video timeline. Left and right preview, select seeks, back cancels."
               accessibilityValue={{
-                text: `${formatTVTimelineTime(scrubPosition ?? currentPlaybackTime)} of ${videoPositionRef.current.duration > 0 ? formatTVTimelineTime(videoPositionRef.current.duration) : 'unknown duration'}`,
+                text: `${formatTVTimelineTime(scrubPosition ?? currentPlaybackTime)} of ${
+                  videoPositionRef.current.duration > 0
+                    ? (showTimeRemaining
+                        ? `-${formatTVTimelineTime(Math.max(0, videoPositionRef.current.duration - (scrubPosition ?? currentPlaybackTime)))} remaining`
+                        : `${formatTVTimelineTime(videoPositionRef.current.duration)} total`)
+                    : 'unknown duration'
+                }`,
               }}
               {...getTVFocusProps('timeline')}
-              onPress={confirmScrub}
+              onPress={handleTimelinePress}
               style={{
                 position: 'absolute',
                 left: '10%',
@@ -3879,8 +3853,7 @@ const Player = ({route}: Props): React.JSX.Element => {
                 padding: 12,
                 borderRadius: 12,
                 borderWidth: 2,
-                borderColor:
-                  tvFocusedControl === 'timeline' ? primary : 'transparent',
+                borderColor: 'transparent',
                 backgroundColor: 'rgba(20,20,20,0.65)',
                 zIndex: 65,
               }}>
@@ -3913,13 +3886,15 @@ const Player = ({route}: Props): React.JSX.Element => {
               <Text style={{color: 'white', fontSize: 14 * controlStyle.scale, marginTop: 6, textAlign: 'center'}}>
                 {formatTVTimelineTime(scrubPosition ?? currentPlaybackTime)} /{' '}
                 {videoPositionRef.current.duration > 0
-                  ? formatTVTimelineTime(videoPositionRef.current.duration)
+                  ? (showTimeRemaining
+                      ? `-${formatTVTimelineTime(Math.max(0, videoPositionRef.current.duration - (scrubPosition ?? currentPlaybackTime)))}`
+                      : formatTVTimelineTime(videoPositionRef.current.duration))
                   : '--:--'}
                 {scrubPosition !== null
                   ? '  •  Select to seek · Back to cancel'
                   : ''}
               </Text>
-            </Pressable>
+            </TVFocusPressable>
           </>
         )}
 
@@ -3950,12 +3925,14 @@ const Player = ({route}: Props): React.JSX.Element => {
                 onWidthChange={setHdrWidth} onInteract={() => setShowControls(true)} />
             {toolbarControls.some(control => control.visible) ? (
                 <PlayerControlBar ids={fittedControlLayout.top} controls={toolbarControls} top
+                  nextFocusDown={playPauseTVHandle ?? undefined}
+                  onEntryHandle={setTopControlTVHandle}
                   onEdit={openControlEditor} appearance={controlStyle} getTVFocusProps={getTVFocusProps} />
             ) : (
-              <TouchableOpacity {...getTVFocusProps('edit_controls')} accessibilityRole="button" accessibilityLabel="Edit player controls" onPress={openControlEditor}
+              <EditControlsButton {...getTVFocusProps('edit_controls')} accessibilityRole="button" accessibilityLabel="Edit player controls" onPress={openControlEditor}
                 className="p-2 items-center justify-center rounded-full">
                 <MaterialCommunityIcons name="tune" size={24 * controlStyle.scale} color={BOTTOM_CONTROL_ICON_COLOR} />
-              </TouchableOpacity>
+              </EditControlsButton>
             )}
             </View>
         </LockAnimatedView>
@@ -3965,6 +3942,8 @@ const Player = ({route}: Props): React.JSX.Element => {
           onLayout={event => setBottomControlHeight(event.nativeEvent.layout.height)}
           style={[controlsStyle, {left: '10%', right: '10%', bottom: 10}]} className="absolute">
           <PlayerControlBar ids={fittedControlLayout.bottom} controls={toolbarControls}
+            nextFocusUp={timelineFocusHandle ?? undefined}
+            onEntryHandle={setBottomControlTVHandle}
             onEdit={openControlEditor} appearance={controlStyle} getTVFocusProps={getTVFocusProps} />
         </NativeAnimated.View>
       )}
@@ -4210,6 +4189,18 @@ const Player = ({route}: Props): React.JSX.Element => {
                     }
                     ListFooterComponent={
                       <>
+                        {savedSubtitles.filter(saved => !textTracks.some(track => findSavedSubtitle(track, [saved]))).map(saved => (
+                          <RemovableSubtitleRow key={saved.id} title={saved.title}
+                            onTVFocus={() => setSettingsCloseFocused(false)}
+                            onRemove={() => {void removeSavedSubtitle(saved.id).catch(error => setToast(error.message, 4000));}}>
+                            <PlayerMenuRow title={languageLabel(saved.language, 'Unknown')} detail={`${saved.title} · Saved`}
+                              icon="subtitles" accentColor={primary} onTVFocus={() => setSettingsCloseFocused(false)}
+                              onPress={() => {
+                                setSelectedTextTrack({type: SelectedTrackType.TITLE, value: savedSubtitleLabel(saved.id)});
+                                setShowSettings(false);
+                              }} />
+                          </RemovableSubtitleRow>
+                        ))}
                         <PlayerMenuRow
                           onTVFocus={() => setSettingsCloseFocused(false)}
                           title="Add external file"
@@ -4226,6 +4217,7 @@ const Player = ({route}: Props): React.JSX.Element => {
                                     'application/ttml+xml',
                                   ],
                                   multiple: false,
+                                  copyToCacheDirectory: true,
                                 },
                               );
 
@@ -4255,33 +4247,41 @@ const Player = ({route}: Props): React.JSX.Element => {
 
                                 const track = {
                                   type: trackType,
-                                  title:
-                                    asset.name && asset.name.length > 20
-                                      ? asset.name.slice(0, 20) + '...'
-                                      : asset.name || 'External Subtitle',
+                                  title: asset.name || 'External Subtitle',
                                   language: 'und',
                                   uri: asset.uri,
                                 };
-                                setExternalSubs((prev: any) => [
-                                  track,
-                                  ...prev,
-                                ]);
+                                await saveSubtitle(track, 'file');
                               }
                             } catch (err) {
-                              console.log(err);
+                              setToast(err instanceof Error ? err.message : 'Could not save subtitle', 4000);
                             }
                           }}
                         />
                         <SearchSubtitles
                           searchQuery={searchQuery}
                           setSearchQuery={setSearchQuery}
-                          onAddSubtitle={track =>
-                            setExternalSubs(prev => [track, ...prev])
-                          }
+                          onAddSubtitle={track => {
+                            void saveSubtitle(track, 'search').catch(error => setToast(error.message || 'Could not save subtitle', 4000));
+                          }}
                         />
                       </>
                     }
-                    renderItem={({item: track}) => (
+                    renderItem={({item: track}) => {
+                      const saved = findSavedSubtitle(track, savedSubtitles);
+                      return <RemovableSubtitleRow title={saved?.title || ''}
+                        onTVFocus={() => setSettingsCloseFocused(false)}
+                        onRemove={saved ? () => {
+                          if (selectedTextTrackIndex === track.index) {
+                            setSelectedTextTrack({type: SelectedTrackType.DISABLED});
+                            setSelectedTextTrackIndex(1000);
+                          } else if (selectedTextTrackIndex !== 1000) {
+                            const current = textTracks.find(item => item.index === selectedTextTrackIndex);
+                            if (current?.title) setSelectedTextTrack({type: SelectedTrackType.TITLE, value: current.title});
+                            if (track.index < selectedTextTrackIndex) setSelectedTextTrackIndex(selectedTextTrackIndex - 1);
+                          }
+                          void removeSavedSubtitle(saved.id).catch(error => setToast(error.message, 4000));
+                        } : undefined}>
                       <PlayerMenuRow
                         onTVFocus={() => setSettingsCloseFocused(false)}
                         ref={
@@ -4290,7 +4290,7 @@ const Player = ({route}: Props): React.JSX.Element => {
                             : undefined
                         }
                         title={languageLabel(track.language, 'Unknown')}
-                        detail={[track.type, track.title]
+                        detail={[saved ? (saved.origin === 'search' ? 'Saved search' : 'Saved file') : track.type, saved?.title || track.title]
                           .filter(Boolean)
                           .join(' · ')}
                         selected={selectedTextTrackIndex === track.index}
@@ -4312,7 +4312,8 @@ const Player = ({route}: Props): React.JSX.Element => {
                           setShowSettings(false);
                         }}
                       />
-                    )}
+                      </RemovableSubtitleRow>;
+                    }}
                   />
                 )}
 

@@ -6,7 +6,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import {useM3Colors} from '../../../theme/M3PaletteContext';
 import SkeletonLoader from '../../../components/Skeleton';
 import AppText from '../../../components/ui/Text';
-import {useTVFocusBorderColor} from '../../../lib/tv/useTVFocusBorderColor';
+import SynopsisText from './SynopsisText';
 import {isTV} from '../../../lib/tv';
 import useTVNavigationStore from '../../../lib/zustand/tvNavigationStore';
 
@@ -180,7 +180,6 @@ const ContentOverview = ({
 }: ContentOverviewProps) => {
   const insets = useSafeAreaInsets();
   const colors = useM3Colors();
-  const focusBorderColor = useTVFocusBorderColor();
   const [logoFailed, setLogoFailed] = useState(false);
   const metadata = useMemo(
     () =>
@@ -190,10 +189,6 @@ const ContentOverview = ({
         .slice(0, 6),
     [genres, runtime, tags, year],
   );
-  const synopsisText =
-    synopsis.length > 240 && !readMore
-      ? `${synopsis.slice(0, 240)}...`
-      : synopsis;
   const normalizedRating = rating?.replace(/\s*\/\s*10$/i, '').trim();
 
   useEffect(() => {
@@ -364,41 +359,12 @@ const ContentOverview = ({
             <SkeletonLoader show height={18} width="72%" marginVertical={0} />
           </View>
         ) : (
-          <AppText
-            role="bodyLarge"
-            style={{
-              color: colors.onSurfaceVariant,
-              lineHeight: 24,
-              marginTop: 10,
-            }}>
-            {synopsisText}
-          </AppText>
+          <SynopsisText
+            synopsis={synopsis}
+            expanded={readMore}
+            onToggle={onToggleSynopsis}
+          />
         )}
-        {!synopsisLoading && synopsis.length > 240 ? (
-          <TVFocusable
-            accessibilityRole="button"
-            accessibilityLabel={
-              readMore ? 'Show less synopsis' : 'Read more synopsis'
-            }
-            accessibilityState={{expanded: readMore}}
-            onPress={onToggleSynopsis}
-            borderRadius={8}
-            focusBorderColor={focusBorderColor}
-            style={{
-              minHeight: 44,
-              paddingVertical: 8,
-              paddingHorizontal: 4,
-              justifyContent: 'center',
-              alignSelf: 'flex-start',
-              flexShrink: 0,
-            }}>
-            <AppText
-              role="labelLargeEmphasized"
-              style={{color: colors.primary}}>
-              {readMore ? 'Show less' : 'Read more'}
-            </AppText>
-          </TVFocusable>
-        ) : null}
 
         <View
           style={{
@@ -408,7 +374,7 @@ const ContentOverview = ({
           }}>
           <InfoAction icon="magnify" label="Search" onPress={onSearchTitle} />
           {onOpenWeb ? (
-            <InfoAction icon="instagram" label="Instagram" onPress={onOpenWeb} />
+            <InfoAction icon="web" label="Web" onPress={onOpenWeb} />
           ) : null}
           {onOpenStory ? (
             <InfoAction

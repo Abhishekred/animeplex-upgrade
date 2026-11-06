@@ -26,7 +26,13 @@ module.exports = () => {
   const APP_SCHEME = IS_PLAYSTORE ? 'vegaapp' : 'com.vega';
   const plugins = [
     './plugins/with-custom-native-modules.js',
-    ...(!IS_TV ? [['expo-camera', {cameraPermission: 'Allow Vega to scan receiver QR codes.', recordAudioAndroid: false}]] : []),
+      [
+        'expo-camera',
+        {
+          cameraPermission: 'Allow Vega to scan receiver QR codes.',
+          recordAudioAndroid: false,
+        },
+      ],
     './plugins/android-native-config.js',
     './plugins/with-saf-copy-module.js',
     './plugins/with-uri-permission-module.js',
@@ -36,7 +42,7 @@ module.exports = () => {
     './plugins/with-notifee-service.js',
     './plugins/with-android-release-gradle.js',
     './plugins/with-native-scroll-performance.js',
-    ...(process.env.APP_VARIANT === 'standalone' ? [] : ['./plugins/with-android-signing.js']),
+    './plugins/with-android-signing.js',
     './plugins/with-android-okhttp.js',
     ...(HAS_FIREBASE ? ['@react-native-firebase/app'] : []),
     ...(HAS_FIREBASE ? ['@react-native-firebase/crashlytics'] : []),
@@ -138,17 +144,16 @@ module.exports = () => {
   ];
   return {
     expo: {
-      name: 'AnimePlex',
+      name: 'Vega',
       scheme: [APP_SCHEME, 'vega-cast'],
-      displayName: 'AnimePlex',
+      displayName: 'Vega',
       jsEngine: 'hermes',
       newArchEnabled: true,
       autolinking: {exclude: ['expo-splash-screen']},
       plugins,
-      slug: 'animeplex',
-      version: '5.3.0',
+      slug: 'vega',
+      version: '5.3.2',
       userInterfaceStyle: 'dark',
-      icon: './assets/aplogo.png',
       experiments: {
         reactCompiler: true,
       },
@@ -157,7 +162,7 @@ module.exports = () => {
           ? {googleServicesFile: androidGoogleServicesFile}
           : {}),
         package: PACKAGE_NAME,
-        versionCode: 208,
+        versionCode: 217,
         permissions: [
           'FOREGROUND_SERVICE',
           'FOREGROUND_SERVICE_DATA_SYNC',
@@ -171,6 +176,8 @@ module.exports = () => {
           'POST_NOTIFICATIONS',
         ],
         blockedPermissions: [
+          // Casting uses WebRTC data channels, not microphone capture.
+          'android.permission.RECORD_AUDIO',
           'android.permission.MANAGE_EXTERNAL_STORAGE',
           'android.permission.READ_EXTERNAL_STORAGE',
           'android.permission.READ_MEDIA_VIDEO',
@@ -189,8 +196,6 @@ module.exports = () => {
         ],
         allowBackup: true,
         adaptiveIcon: {
-          // Use the launcher-safe artwork with transparent breathing room.
-          // The full-bleed app logo is cropped by Android's adaptive-icon mask.
           foregroundImage: './assets/adaptive_icon.png',
           backgroundColor: '#000000',
         },
@@ -198,17 +203,20 @@ module.exports = () => {
         supportsPictureInPicture: true,
       },
       ios: {
-        bundleIdentifier: PACKAGE_NAME,
         ...(!IS_PLAYSTORE && hasIosGooglePlist
           ? {googleServicesFile: iosGoogleServicesFile}
           : {}),
       },
       platforms: ['ios', 'android'],
       extra: {
-        vegaCastServiceUrl: process.env.VEGA_CAST_SERVICE_URL || 'https://cast.vega-app.in/vega-cast/v1',
+        vegaCastServiceUrl:
+          process.env.VEGA_CAST_SERVICE_URL ||
+          'https://cast.vega-app.in/vega-cast/v1',
         // Optional STUN/TURN servers. Use short-lived TURN credentials in builds;
         // never commit a permanent relay secret. Empty means same-LAN ICE only.
-        vegaCastIceServers: JSON.parse(process.env.VEGA_CAST_ICE_SERVERS || '[]'),
+        vegaCastIceServers: JSON.parse(
+          process.env.VEGA_CAST_ICE_SERVERS || '[]',
+        ),
         eas: {
           projectId: '40d98354-d3c8-4616-ab2e-70d9c297091f',
         },

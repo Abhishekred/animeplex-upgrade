@@ -11,6 +11,8 @@ import {
 /**
  * Storage keys for settings
  */
+export type VerificationWindowPolicy = 'ask' | 'allow' | 'block';
+
 export enum SettingsKeys {
   // UI preferences
   PRIMARY_COLOR = 'primaryColor',
@@ -30,6 +32,7 @@ export enum SettingsKeys {
   AUTO_CHECK_UPDATE = 'autoCheckUpdate',
   AUTO_DOWNLOAD = 'autoDownload',
   AUTO_UPDATE_PROVIDERS = 'autoUpdateProviders',
+  VERIFICATION_WINDOWS = 'verificationWindows',
 
   // Player settings
   OPEN_VIDEOS_FROM_OTHER_APPS = 'openVideosFromOtherApps',
@@ -39,6 +42,7 @@ export enum SettingsKeys {
   SHOW_PLAYER_EPISODE_SIDEBAR = 'showPlayerEpisodeSidebar',
   AUTO_PLAY_NEXT_EPISODE = 'autoPlayNextEpisode',
   SHOW_SLEEP_TIMER = 'showSleepTimer',
+  SHOW_TIME_REMAINING = 'showTimeRemaining',
   AMBIENT_VIDEO = 'ambientVideo',
   AMBIENT_INTENSITY = 'ambientIntensity',
   AMBIENT_SPREAD = 'ambientSpread',
@@ -107,6 +111,9 @@ export enum SettingsKeys {
   ALWAYS_CAST_MODE = 'alwaysCastMode',
   ASK_LOCAL_FILE_FIRST = 'askLocalFileFirst',
   TORRENT_FULL_DOWNLOAD = 'torrentFullDownload',
+
+  // VegaSync
+  SYNC_ENABLED = 'syncEnabled',
 }
 
 /**
@@ -185,6 +192,15 @@ const clampBufferMB = (
 };
 
 export class SettingsStorage {
+  getVerificationWindowPolicy(): VerificationWindowPolicy {
+    const value = mainStorage.getString(SettingsKeys.VERIFICATION_WINDOWS);
+    return value === 'allow' || value === 'block' ? value : 'ask';
+  }
+
+  setVerificationWindowPolicy(value: VerificationWindowPolicy): void {
+    mainStorage.setString(SettingsKeys.VERIFICATION_WINDOWS, value);
+  }
+
   isOpenVideosFromOtherAppsEnabled(): boolean {
     return mainStorage.getBool(SettingsKeys.OPEN_VIDEOS_FROM_OTHER_APPS, true);
   }
@@ -221,6 +237,14 @@ export class SettingsStorage {
 
   setTorrentFullDownload(enabled: boolean): void {
     mainStorage.setBool(SettingsKeys.TORRENT_FULL_DOWNLOAD, enabled);
+  }
+
+  isSyncEnabled(): boolean {
+    return mainStorage.getBool(SettingsKeys.SYNC_ENABLED, true);
+  }
+
+  setSyncEnabled(enabled: boolean): void {
+    mainStorage.setBool(SettingsKeys.SYNC_ENABLED, enabled);
   }
 
   // Theme settings
@@ -434,6 +458,14 @@ export class SettingsStorage {
 
   setShowSleepTimer(show: boolean): void {
     mainStorage.setBool(SettingsKeys.SHOW_SLEEP_TIMER, show);
+  }
+
+  isShowTimeRemaining(): boolean {
+    return mainStorage.getBool(SettingsKeys.SHOW_TIME_REMAINING, false);
+  }
+
+  setShowTimeRemaining(show: boolean): void {
+    mainStorage.setBool(SettingsKeys.SHOW_TIME_REMAINING, show);
   }
 
   isEnable2xGestureEnabled(): boolean {

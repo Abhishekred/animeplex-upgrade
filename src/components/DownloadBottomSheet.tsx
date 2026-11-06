@@ -1,3 +1,4 @@
+import {usesExternalApp} from '../lib/externalApps';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {
   Text,
@@ -176,6 +177,10 @@ const DownloadBottomSheet = ({
   onDeleteSub,
 }: Props) => {
   const bottomSheetRef = useRef<BottomSheet>(null);
+  // The sheet only caps its content height after it measures itself. When
+  // cached streams render on the first frame, the list lays out at its full
+  // content height and has nothing to scroll, so cap it from the modal size.
+  const [sheetContainerHeight, setSheetContainerHeight] = React.useState(0);
   const tvCloseRef = useRef<View>(null);
   const tvFirstRowRef = useRef<View>(null);
   const closeSheet = () => {
@@ -185,7 +190,7 @@ const DownloadBottomSheet = ({
   const colors = useM3Colors();
   const [activeTab, setActiveTab] = React.useState<1 | 2>(1);
   const isAlwaysExternal =
-    settingsStorage.getBool('alwaysExternalDownloader') === true;
+    usesExternalApp('downloader');
   const streams = Array.isArray(data) ? data : [];
 
   const downloadedSubs = downloadedSubtitles || [];
@@ -221,7 +226,6 @@ const DownloadBottomSheet = ({
   useEffect(() => {
     if (showModal) {
       setActiveTab(1);
-      bottomSheetRef.current?.snapToIndex?.(0);
     }
   }, [showModal]);
 
@@ -933,7 +937,9 @@ const DownloadBottomSheet = ({
       animationType="none"
       onRequestClose={() => setModal(false)}
       statusBarTranslucent>
-      <GestureHandlerRootView style={StyleSheet.absoluteFill}>
+      <GestureHandlerRootView
+        style={StyleSheet.absoluteFill}
+        onLayout={event => setSheetContainerHeight(event.nativeEvent.layout.height)}>
         <BottomSheet
           ref={bottomSheetRef}
           index={0}
@@ -964,7 +970,10 @@ const DownloadBottomSheet = ({
             trapFocusDown={isTV}
             style={{
               backgroundColor: colors.surfaceContainerLow,
-              flex: 1,
+              // Height of the 85% snap point minus the 24 px handle.
+              ...(sheetContainerHeight > 0
+                ? {height: sheetContainerHeight * 0.85 - 24}
+                : {flex: 1}),
               paddingHorizontal: 16,
               paddingTop: 8,
             }}>

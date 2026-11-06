@@ -237,7 +237,7 @@ const Extensions = ({navigation, route}: Props) => {
     const providerKey = `${provider.source?.author || ''}:${provider.value}`;
     setUpdatingProvider(providerKey);
     try {
-      const success = await updateProvidersService.updateProvider(provider);
+      const success = await updateProvidersService.updateProvider(provider, {throwOnError: true});
       if (success) {
         loadProviders();
         await checkForUpdates();

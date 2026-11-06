@@ -37,8 +37,9 @@ import Preferences from './screens/settings/Preference';
 import PlayerSettings from './screens/settings/PlayerSettings';
 import PlayerControlSettings from './screens/settings/PlayerControlSettings';
 import Appearance from './screens/settings/Appearance';
+import DataManagement from './screens/settings/DataManagement';
 import {M3ThemeProvider} from './theme/M3ThemeProvider';
-import {Alert, AppState, Linking, LogBox, useWindowDimensions} from 'react-native';
+import {AppState, Linking, LogBox, useWindowDimensions} from 'react-native';
 import {vegaCastService} from './lib/remote/vegaCastService';
 import {EpisodeLink, Stream} from './lib/providers/types';
 import {
@@ -50,9 +51,8 @@ import DownloadedDetails from './screens/downloads/DownloadedDetails';
 import SubtitlePreference from './screens/settings/SubtitleSettings';
 import Extensions from './screens/settings/Extensions';
 import Constants from 'expo-constants';
-import {settingsStorage} from './lib/storage';
+import {settingsStorage, migrateWatchProgressFromCacheStorage} from './lib/storage';
 import {syncParallelStreaming} from './lib/parallelStreaming';
-import {startRemoteAdminSync, subscribeRemoteAdminConfig} from './lib/services/remoteAdmin';
 import {updateProvidersService} from './lib/services/UpdateProviders';
 import {QueryClientProvider} from '@tanstack/react-query';
 import {queryClient} from './lib/client';
@@ -60,6 +60,7 @@ import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import notifee, {EventType} from '@notifee/react-native';
 import notificationService from './lib/services/Notification';
 import WafWebViewDialog from './components/WafWebViewDialog';
+import VerificationConsentDialog from './components/VerificationConsentDialog';
 import ProviderSandboxHost from './components/ProviderSandboxHost';
 import {syncDohSettings} from './lib/services/dohService';
 import {syncWarpSettings} from './lib/services/warpService';
@@ -168,11 +169,12 @@ export type SettingsStackParamList = {
   SubTitlesPreferences: undefined;
   Extensions: {addSource?: string; requestId?: number} | undefined;
   DownloadsStack: undefined;
+  DataManagement: undefined;
 };
 
 export type DownloadsStackParamList = {
   Downloads: undefined;
-  DownloadedDetails: {groupId: string};
+  DownloadedDetails: {groupId: string; localTitleId?: never} | {localTitleId: string; groupId?: never};
   Info: {link: string; provider?: string; poster?: string};
 };
 
@@ -444,6 +446,7 @@ function SettingsStackScreen() {
       />
       <SettingsStack.Screen name="PlayerSettings" component={PlayerSettings} options={subpageOptions} />
       <SettingsStack.Screen name="PlayerControlSettings" component={PlayerControlSettings} options={subpageOptions} />
+      <SettingsStack.Screen name="DataManagement" component={DataManagement} options={subpageOptions} />
       <SettingsStack.Screen
         name="Preferences"
         component={Preferences}
@@ -525,33 +528,6 @@ function TabStack() {
 }
 
 const App = () => {
-  // Connect to the AnimePlex Control Center. Remote config is optional; the app remains usable offline.
-  useEffect(() => {
-    const unsubscribe = subscribeRemoteAdminConfig(config => {
-      const general = config.general;
-      if (general?.maintenanceMode) {
-        Alert.alert(
-          'AnimePlex maintenance',
-          general.announcementMessage ||
-            'AnimePlex is under maintenance. Some features may be temporarily unavailable.',
-        );
-        return;
-      }
-      if (general?.announcementEnabled) {
-        const title = general.announcementTitle?.trim();
-        const message = general.announcementMessage?.trim();
-        if (title || message) {
-          Alert.alert(title || 'AnimePlex announcement', message || '');
-        }
-      }
-    });
-    const stop = startRemoteAdminSync();
-    return () => {
-      unsubscribe();
-      stop();
-    };
-  }, []);
-
   useEffect(()=>{
     void Linking.getInitialURL().then(url=>{if(url)vegaCastService.handleInvitation(url);});
     const subscription=Linking.addEventListener('url',event=>{vegaCastService.handleInvitation(event.url);});
@@ -573,6 +549,12 @@ const App = () => {
       BootSplash.hide({fade: true}).catch(() => {});
     }, 1200);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    migrateWatchProgressFromCacheStorage().catch(error =>
+      console.warn('Watch progress migration failed:', error),
+    );
   }, []);
 
   // Reconcile downloads once the store hydrates, then start shared folder sync.
@@ -604,19 +586,23 @@ const App = () => {
         reconcileCompletedDownloadOutputs().catch(error =>
           console.warn('Download foreground reconciliation failed:', error),
         );
-        syncFromSharedFolder().catch(error =>
-          console.warn('[VegaSync] Foreground sync failed:', error),
-        );
+        if (settingsStorage.isSyncEnabled()) {
+          syncFromSharedFolder().catch(error =>
+            console.warn('[VegaSync] Foreground sync failed:', error),
+          );
+        }
       } else {
         beginUIInteraction('app-background');
         flushInteractionCommits();
-        publishSyncManifest().catch(error =>
-          console.warn('[VegaSync] Background publish failed:', error),
-        );
+        if (settingsStorage.isSyncEnabled()) {
+          publishSyncManifest().catch(error =>
+            console.warn('[VegaSync] Background publish failed:', error),
+          );
+        }
       }
     });
     const interval = setInterval(() => {
-      if (AppState.currentState === 'active') {
+      if (AppState.currentState === 'active' && settingsStorage.isSyncEnabled()) {
         scheduleWhenIdle(() => syncFromSharedFolder());
       }
     }, 30000);
@@ -786,6 +772,7 @@ const App = () => {
               </NavigationContainer>
               {/* Global WAF / captcha solving dialog, triggered by providers via
                 providerContext.openWebView */}
+              <VerificationConsentDialog />
               <WafWebViewDialog />
               <RemoteVolumeToast />
               {/* Isolated realm that runs untrusted provider code. Must stay
