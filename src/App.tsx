@@ -39,7 +39,7 @@ import PlayerControlSettings from './screens/settings/PlayerControlSettings';
 import Appearance from './screens/settings/Appearance';
 import DataManagement from './screens/settings/DataManagement';
 import {M3ThemeProvider} from './theme/M3ThemeProvider';
-import {AppState, Linking, LogBox, useWindowDimensions} from 'react-native';
+import {Alert, AppState, Linking, LogBox, useWindowDimensions} from 'react-native';
 import {vegaCastService} from './lib/remote/vegaCastService';
 import {EpisodeLink, Stream} from './lib/providers/types';
 import {
@@ -65,6 +65,7 @@ import ProviderSandboxHost from './components/ProviderSandboxHost';
 import {syncDohSettings} from './lib/services/dohService';
 import {syncWarpSettings} from './lib/services/warpService';
 import {syncByeDpiSettings} from './lib/services/byeDpiService';
+import {fetchAnimePlexAdminConfig} from './lib/services/adminConfig';
 import {
   getInitialSourceIntent,
   setPendingSourceToken,
@@ -538,6 +539,31 @@ const App = () => {
       Boolean(Constants?.expoConfig?.extra?.hasFirebase) &&
       isFirebaseNativeReady(),
   );
+
+  // Load public settings controlled by AnimePlex Control Center.
+  // Network failure is non-fatal: the app continues with its local defaults.
+  useEffect(() => {
+    let active = true;
+    fetchAnimePlexAdminConfig().then(config => {
+      if (!active || !config) return;
+      const general = config.general;
+      if (general?.maintenanceMode) {
+        Alert.alert(
+          'AnimePlex maintenance',
+          general.announcementMessage ||
+            'AnimePlex is temporarily under maintenance. Please try again later.',
+        );
+      } else if (general?.announcementEnabled && general.announcementMessage) {
+        Alert.alert(
+          general.announcementTitle || 'AnimePlex announcement',
+          general.announcementMessage,
+        );
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     syncParallelStreaming();
