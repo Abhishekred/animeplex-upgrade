@@ -49,6 +49,7 @@ import {
   watchProgressStorage,
 } from '../../lib/storage';
 import {getCachedAnimePlexAdminConfig} from '../../lib/services/adminConfig';
+import useAdminConfigStore from '../../lib/zustand/adminConfigStore';
 import Orientation, {
   OrientationLocker,
   PORTRAIT,
@@ -1537,6 +1538,7 @@ const Player = ({route}: Props): React.JSX.Element => {
     });
 
   // Selected tracks, reset to the defaults whenever the stream changes
+  const adminPlaybackConfig = useAdminConfigStore(state => state.config?.playback);
   const {
     selectedAudioTrack,
     setSelectedAudioTrack,
@@ -2771,6 +2773,55 @@ const Player = ({route}: Props): React.JSX.Element => {
   useEffect(() => {
     setSearchQuery(route.params?.primaryTitle || '');
   }, [route.params?.primaryTitle]);
+
+  // Apply the Admin Panel's preferred video quality once tracks are available.
+  // AUTO remains the default unless a fixed quality is explicitly selected.
+  useEffect(() => {
+    if (selectedQualityIndex !== 1000 || videoTracks.length === 0) return;
+
+    const preferredQuality = String(adminPlaybackConfig?.defaultQuality || 'auto')
+      .trim()
+      .toLowerCase();
+    const automatic = adminPlaybackConfig?.autoQuality !== false ||
+      preferredQuality === 'auto';
+
+    if (automatic) {
+      setSelectedVideoTrack({type: SelectedVideoTrackType.AUTO, value: ''});
+      return;
+    }
+
+    const preferredHeight = Number(preferredQuality.match(/\\d+/)?.[0]);
+    if (!Number.isFinite(preferredHeight) || preferredHeight <= 0) return;
+
+    const candidates = videoTracks
+      .map((track, index) => ({track, index, height: Number(track.height) || 0}))
+      .filter(item => item.height > 0)
+      .sort((a, b) => a.height - b.height);
+    if (candidates.length === 0) return;
+
+    const selected =
+      candidates.filter(item => item.height <= preferredHeight).pop() ||
+      candidates[0];
+    if (typeof selected.track.index === 'number' && selected.track.index >= 0) {
+      setSelectedVideoTrack({
+        type: SelectedVideoTrackType.INDEX,
+        value: String(selected.track.index),
+      });
+    } else {
+      setSelectedVideoTrack({
+        type: SelectedVideoTrackType.RESOLUTION,
+        value: String(selected.height),
+      });
+    }
+    setSelectedQualityIndex(selected.index);
+  }, [
+    adminPlaybackConfig?.autoQuality,
+    adminPlaybackConfig?.defaultQuality,
+    selectedQualityIndex,
+    setSelectedQualityIndex,
+    setSelectedVideoTrack,
+    videoTracks,
+  ]);
 
   // Set last selected audio and subtitle tracks
   useEffect(() => {
