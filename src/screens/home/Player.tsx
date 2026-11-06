@@ -48,6 +48,7 @@ import {
   settingsStorage,
   watchProgressStorage,
 } from '../../lib/storage';
+import {getCachedAnimePlexAdminConfig} from '../../lib/services/adminConfig';
 import Orientation, {
   OrientationLocker,
   PORTRAIT,
@@ -1862,7 +1863,9 @@ const Player = ({route}: Props): React.JSX.Element => {
   const handleVideoEnd = useCallback(() => {
     if (consumeEpisodeEnd()) return;
     const allowed = shouldAutoPlayNext({
-      enabled: settingsStorage.isAutoPlayNextEpisodeEnabled(),
+      enabled:
+        settingsStorage.isAutoPlayNextEpisodeEnabled() &&
+        getCachedAnimePlexAdminConfig()?.features?.autoPlay !== false,
       hasNext: hasNextEpisode,
       isCasting,
       isMovie: route.params?.type === 'movie',
