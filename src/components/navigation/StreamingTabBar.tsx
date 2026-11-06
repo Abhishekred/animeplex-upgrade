@@ -139,6 +139,8 @@ const StreamingTabButton = ({
                   marginTop: 4,
                   textAlign: 'center',
                   fontWeight: focused ? '700' : isFocused ? '600' : '400',
+                  fontSize: typeof colors.adminFontSize === 'number' ? colors.adminFontSize : undefined,
+                  fontFamily: typeof colors.adminFontFamily === 'string' && colors.adminFontFamily.trim() ? colors.adminFontFamily : undefined,
                 }}>
                 {label}
               </AppText>
@@ -202,7 +204,9 @@ const StreamingTabButton = ({
             color: isFocused ? colors.onSurface : colors.onSurfaceVariant,
             marginTop: 4,
             textAlign: 'center',
-            fontWeight: isFocused ? '600' : '400',
+            fontWeight: typeof colors.adminFontWeight === 'string' ? colors.adminFontWeight : isFocused ? '600' : '400',
+            fontSize: typeof colors.adminFontSize === 'number' ? colors.adminFontSize : undefined,
+            fontFamily: typeof colors.adminFontFamily === 'string' && colors.adminFontFamily.trim() ? colors.adminFontFamily : undefined,
           }}>
           {label}
         </AppText>
@@ -303,7 +307,7 @@ const StreamingTabBar = ({
               accessibilityLabel={descriptor.options.tabBarAccessibilityLabel}
               isNavigationRail={isNavigationRail}
               showLabels={showLabels}
-              colors={{...colors, secondaryContainer: activePill, onSecondaryContainer: activeIcon, onSurfaceVariant: inactiveIcon, onSurface: tabText}}
+              colors={{...colors, secondaryContainer: activePill, onSecondaryContainer: activeIcon, onSurfaceVariant: inactiveIcon, onSurface: tabText, adminFontSize: adminNavigationEnabled ? adminNavigation?.fontSize : undefined, adminFontWeight: adminNavigationEnabled ? adminNavigation?.fontWeight : undefined, adminFontFamily: adminNavigationEnabled ? adminNavigation?.fontFamily : undefined}}
               onPress={onPress}
               onLongPress={() =>
                 navigation.emit({type: 'tabLongPress', target: route.key})
