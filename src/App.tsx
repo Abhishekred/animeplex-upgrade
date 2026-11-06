@@ -332,7 +332,10 @@ const compareAppVersions = (left: string, right: string) => {
 const logScreenView = async () => {
   try {
     // Respect both the user's local telemetry choice and the remote privacy switch.
-    if (useAdminConfigStore.getState().config?.privacy?.analyticsEnabled === false) {
+    if (
+      !settingsStorage.isTelemetryOptIn() ||
+      useAdminConfigStore.getState().config?.privacy?.analyticsEnabled === false
+    ) {
       return;
     }
     const route = navigationRef.getCurrentRoute();
@@ -608,7 +611,18 @@ const App = () => {
       const currentVersion = Constants.expoConfig?.version || '0.0.0';
       const security = config.security;
       const blocked = security?.blockedVersions?.includes(currentVersion) === true;
-      const requiredVersion = security?.minimumSupportedVersion || config.general?.minimumAppVersion;
+      const requiredVersions = [
+        security?.minimumSupportedVersion,
+        config.general?.minimumAppVersion,
+      ].filter((version): version is string => Boolean(version?.trim()));
+      // Honor the stricter of the legacy general minimum and the security minimum.
+      const requiredVersion = requiredVersions.reduce<string | undefined>(
+        (highest, candidate) =>
+          !highest || compareAppVersions(candidate, highest) > 0
+            ? candidate
+            : highest,
+        undefined,
+      );
       const belowMinimum = Boolean(requiredVersion) &&
         compareAppVersions(currentVersion, requiredVersion!) < 0;
       if (blocked || (security?.forceUpdate === true && belowMinimum)) {
@@ -635,7 +649,8 @@ const App = () => {
       } else if (
         general?.announcementEnabled &&
         general.announcementMessage &&
-        config.notifications?.inApp !== false
+        config.notifications?.inApp !== false &&
+        config.notifications?.featureAlerts !== false
       ) {
         Alert.alert(
           general.announcementTitle || 'AnimePlex announcement',
