@@ -132,6 +132,7 @@ export const checkForUpdate = async (
         'No published AnimePlex release found yet. Please try again later.',
         ToastAndroid.LONG,
       );
+      setUpdateLoading(false);
       return;
     }
     const localVersion = Application.nativeApplicationVersion || '0.0.0';
