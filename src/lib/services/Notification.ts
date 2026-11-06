@@ -8,6 +8,7 @@ import notifee, {
   AuthorizationStatus,
 } from '@notifee/react-native';
 import {settingsStorage} from '../storage';
+import useAdminConfigStore from '../zustand/adminConfigStore';
 import * as RNFS from '@dr.pogodin/react-native-fs';
 import RNApkInstaller from '@himanshu8443/react-native-apk-installer';
 import * as IntentLauncher from 'expo-intent-launcher';
@@ -237,6 +238,13 @@ class NotificationService {
    * Display an update notification
    */
   async displayUpdateNotification(options: NotificationOptions): Promise<void> {
+    // Release/provider update alerts can be disabled centrally without
+    // suppressing essential download progress and foreground-service notices.
+    if (
+      useAdminConfigStore.getState().config?.notifications?.releaseAlerts === false
+    ) {
+      return;
+    }
     await this.displayNotification(options, this._updateChannelId);
   }
 
