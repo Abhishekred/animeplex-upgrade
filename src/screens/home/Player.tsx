@@ -1457,9 +1457,13 @@ const Player = ({route}: Props): React.JSX.Element => {
   useMemo(() => syncParallelStreaming(), []);
   const backBufferMB = useMemo(() => settingsStorage.getBackBufferMB(), []);
   const showMediaControls = useMemo(
-    () => settingsStorage.showMediaControls(),
+    () =>
+      settingsStorage.showMediaControls() &&
+      getCachedAnimePlexAdminConfig()?.playback?.playerControls !== false,
     [],
   );
+  const adminCastEnabled =
+    getCachedAnimePlexAdminConfig()?.features?.cast !== false;
 
   // Memoized watched duration
   const watchedDuration = useMemo(() => {
@@ -3346,7 +3350,7 @@ const Player = ({route}: Props): React.JSX.Element => {
       title: 'Cast video',
       label: 'Cast',
       icon: 'cast',
-      visible: !isTV && canCastStream,
+      visible: !isTV && canCastStream && adminCastEnabled,
       onPress: () => {
         flushProgress();
         setCastRequested(true);
