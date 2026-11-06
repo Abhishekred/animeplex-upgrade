@@ -315,6 +315,20 @@ const playerScreenOptions = ({route}: {route: {params?: object}}) => {
   };
 };
 
+const compareAppVersions = (left: string, right: string) => {
+  const parse = (value: string) => value.split('.').map(part => {
+    const match = part.match(/^\\d+/);
+    return match ? Number(match[0]) : 0;
+  });
+  const a = parse(left);
+  const b = parse(right);
+  for (let index = 0; index < Math.max(a.length, b.length); index++) {
+    const difference = (a[index] || 0) - (b[index] || 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+};
+
 const logScreenView = async () => {
   try {
     const route = navigationRef.getCurrentRoute();
@@ -585,6 +599,25 @@ const App = () => {
         if (defaultProvider && !defaultProvider.disabled) {
           useContentStore.getState().setProvider(defaultProvider);
         }
+      }
+
+      const currentVersion = Constants.expoConfig?.version || '0.0.0';
+      const security = config.security;
+      const blocked = security?.blockedVersions?.includes(currentVersion) === true;
+      const requiredVersion = security?.minimumSupportedVersion || config.general?.minimumAppVersion;
+      const belowMinimum = Boolean(requiredVersion) &&
+        compareAppVersions(currentVersion, requiredVersion!) < 0;
+      if (blocked || (security?.forceUpdate === true && belowMinimum)) {
+        Alert.alert(
+          'AnimePlex update required',
+          blocked
+            ? 'This app version is no longer supported. Install the latest AnimePlex release to continue.'
+            : `Please update AnimePlex to version ${requiredVersion} or newer to continue.`,
+          [{text: 'Get update', onPress: () => {
+            Linking.openURL('https://github.com/Abhishekred/animeplex-upgrade/releases').catch(() => {});
+          }}],
+          {cancelable: false},
+        );
       }
 
       const general = config.general;
