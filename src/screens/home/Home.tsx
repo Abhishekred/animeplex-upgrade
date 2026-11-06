@@ -102,6 +102,16 @@ const Home = ({}: Props) => {
     }
   }, []);
   const installedProviders = useContentStore(state => state.installedProviders);
+  const adminShortcuts = useAdminConfigStore(state => state.config?.homeShortcuts ?? []);
+  const adminContent = useAdminConfigStore(state => state.config?.content);
+  const visibleShortcuts = useMemo(
+    () => adminShortcuts.filter(item => item.enabled && installedProviders?.some(
+      candidate => candidate.value.toLowerCase() === item.providerValue.toLowerCase() ||
+        candidate.display_name.toLowerCase() === item.providerValue.toLowerCase(),
+    )),
+    [adminShortcuts, installedProviders],
+  );
+
   const setHeroes = useHeroStore(state => state.setHeroes);
 
   // React Query for home page data with better error handling
@@ -221,7 +231,16 @@ const Home = ({}: Props) => {
     ],
   );
 
-  const staged = useStagedHomeRows(rows, JSON.stringify([
+  const adminFilteredRows = useMemo(() => rows.filter(row => {
+    const haystack = `${row.title} ${row.filter}`.toLowerCase();
+    if (adminContent?.movies === false && /movie|film/.test(haystack)) return false;
+    if (adminContent?.anime === false && /anime/.test(haystack)) return false;
+    if (adminContent?.tvSeries === false && /tv.?series|television/.test(haystack)) return false;
+    if (adminContent?.webSeries === false && /web.?series/.test(haystack)) return false;
+    if (adminContent?.featuredEnabled === false && /featured|trending|spotlight/.test(haystack)) return false;
+    return true;
+  }), [rows, adminContent]);
+  const staged = useStagedHomeRows(adminFilteredRows, JSON.stringify([
     provider.source?.author, provider.source?.url, provider.value, provider.version,
   ]), !isTV, isFocused);
   const providerValue = provider?.value;
@@ -352,6 +371,37 @@ const Home = ({}: Props) => {
                     isVisible={heroVisible}
                     onOpenDrawer={openDrawer}
                   />
+                  {visibleShortcuts.length > 0 && (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{gap: 10, paddingHorizontal: 16, paddingVertical: 12}}>
+                      {visibleShortcuts.map(shortcut => {
+                        const target = installedProviders.find(candidate =>
+                          candidate.value.toLowerCase() === shortcut.providerValue.toLowerCase() ||
+                          candidate.display_name.toLowerCase() === shortcut.providerValue.toLowerCase(),
+                        );
+                        if (!target) return null;
+                        return (
+                          <Pressable
+                            key={shortcut.id}
+                            onPress={() => useContentStore.getState().setProvider(target)}
+                            style={{
+                              paddingHorizontal: 16,
+                              paddingVertical: 9,
+                              borderRadius: 20,
+                              backgroundColor: colors.surfaceContainerHighest,
+                              borderWidth: 1,
+                              borderColor: colors.outlineVariant,
+                            }}>
+                            <AppText role="labelLarge" style={{color: colors.onSurface}}>
+                              {shortcut.label.trim() || target.display_name}
+                            </AppText>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  )}
                   {showContinueWatching && <ContinueWatching />}
                 </>
               }
