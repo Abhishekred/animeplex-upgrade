@@ -622,6 +622,8 @@ const SidebarEpisodeRow = React.memo<SidebarEpisodeRowProps>(
 );
 
 const Player = ({route}: Props): React.JSX.Element => {
+  const adminFeatures = useAdminConfigStore(state => state.config?.features);
+  const adminPlaybackConfig = useAdminConfigStore(state => state.config?.playback);
   const [syncReady, setSyncReady] = useState(false);
 
   useEffect(() => {
@@ -1410,7 +1412,7 @@ const Player = ({route}: Props): React.JSX.Element => {
   // Currently active skip interval based on playback position
   const activeSkip = useMemo(() => {
     if (
-      getCachedAnimePlexAdminConfig()?.features?.skipIntro === false ||
+      adminFeatures?.skipIntro === false ||
       !combinedSkips ||
       combinedSkips.length === 0
     ) return null;
@@ -1419,7 +1421,7 @@ const Player = ({route}: Props): React.JSX.Element => {
         s => currentPlaybackTime >= s.from && currentPlaybackTime < s.to,
       ) || null
     );
-  }, [combinedSkips, currentPlaybackTime]);
+  }, [adminFeatures?.skipIntro, combinedSkips, currentPlaybackTime]);
 
   const handleSkip = useCallback(() => {
     if (!activeSkip) return;
@@ -1464,11 +1466,10 @@ const Player = ({route}: Props): React.JSX.Element => {
   const showMediaControls = useMemo(
     () =>
       settingsStorage.showMediaControls() &&
-      getCachedAnimePlexAdminConfig()?.playback?.playerControls !== false,
-    [],
+      adminPlaybackConfig?.playerControls !== false,
+    [adminPlaybackConfig?.playerControls],
   );
-  const adminCastEnabled =
-    getCachedAnimePlexAdminConfig()?.features?.cast !== false;
+  const adminCastEnabled = adminFeatures?.cast !== false;
 
   // Memoized watched duration
   const watchedDuration = useMemo(() => {
@@ -1538,7 +1539,6 @@ const Player = ({route}: Props): React.JSX.Element => {
     });
 
   // Selected tracks, reset to the defaults whenever the stream changes
-  const adminPlaybackConfig = useAdminConfigStore(state => state.config?.playback);
   const {
     selectedAudioTrack,
     setSelectedAudioTrack,
@@ -1875,13 +1875,13 @@ const Player = ({route}: Props): React.JSX.Element => {
     const allowed = shouldAutoPlayNext({
       enabled:
         settingsStorage.isAutoPlayNextEpisodeEnabled() &&
-        getCachedAnimePlexAdminConfig()?.features?.autoPlay !== false,
+        adminFeatures?.autoPlay !== false,
       hasNext: hasNextEpisode,
       isCasting,
       isMovie: route.params?.type === 'movie',
     });
     if (allowed) setAutoNextVisible(true);
-  }, [hasNextEpisode, isCasting, route.params?.type, consumeEpisodeEnd]);
+  }, [adminFeatures?.autoPlay, hasNextEpisode, isCasting, route.params?.type, consumeEpisodeEnd]);
 
   // Going back in the video means the viewer is not done with it yet.
   const handleVideoSeek = useCallback(
