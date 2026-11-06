@@ -1408,7 +1408,11 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   // Currently active skip interval based on playback position
   const activeSkip = useMemo(() => {
-    if (!combinedSkips || combinedSkips.length === 0) return null;
+    if (
+      getCachedAnimePlexAdminConfig()?.features?.skipIntro === false ||
+      !combinedSkips ||
+      combinedSkips.length === 0
+    ) return null;
     return (
       combinedSkips.find(
         s => currentPlaybackTime >= s.from && currentPlaybackTime < s.to,
@@ -2770,8 +2774,15 @@ const Player = ({route}: Props): React.JSX.Element => {
 
   // Set last selected audio and subtitle tracks
   useEffect(() => {
-    const lastAudioTrack = cacheStorage.getString('lastAudioTrack') || 'auto';
-    const lastTextTrack = cacheStorage.getString('lastTextTrack') || 'auto';
+    const playbackConfig = getCachedAnimePlexAdminConfig()?.playback;
+    const lastAudioTrack =
+      cacheStorage.getString('lastAudioTrack') ||
+      playbackConfig?.defaultAudio ||
+      'auto';
+    const lastTextTrack =
+      cacheStorage.getString('lastTextTrack') ||
+      playbackConfig?.preferredSubtitle ||
+      'auto';
 
     if (!hasSetInitialAudioRef.current && audioTracks.length > 0) {
       hasSetInitialAudioRef.current = true;
@@ -2787,7 +2798,11 @@ const Player = ({route}: Props): React.JSX.Element => {
       }
     }
 
-    if (!hasSetInitialTextRef.current && textTracks.length > 0) {
+    if (
+      playbackConfig?.subtitlesEnabled !== false &&
+      !hasSetInitialTextRef.current &&
+      textTracks.length > 0
+    ) {
       hasSetInitialTextRef.current = true;
       let textTrackIndex = textTracks.findIndex(
         track =>
