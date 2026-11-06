@@ -67,6 +67,7 @@ import {syncWarpSettings} from './lib/services/warpService';
 import {syncByeDpiSettings} from './lib/services/byeDpiService';
 import {fetchAnimePlexAdminConfig} from './lib/services/adminConfig';
 import useAdminConfigStore from './lib/zustand/adminConfigStore';
+import useContentStore from './lib/zustand/contentStore';
 import {
   getInitialSourceIntent,
   setPendingSourceToken,
