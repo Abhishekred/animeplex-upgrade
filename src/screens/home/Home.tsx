@@ -35,6 +35,7 @@ import ContinueWatching from '../../components/ContinueWatching';
 import StatusBarScrim from '../../components/ui/StatusBarScrim';
 import {isTV} from '../../lib/tv/constants';
 import useNavigationPreferencesStore from '../../lib/zustand/navigationPreferencesStore';
+import useAdminConfigStore from '../../lib/zustand/adminConfigStore';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Home'>;
 
@@ -74,10 +75,12 @@ const Home = ({}: Props) => {
     state => state.showContinueWatching,
   );
 
-  // Memoize static values
+  const adminHamburgerEnabled = useAdminConfigStore(
+    state => state.config?.features?.hamburgerMenu !== false,
+  );
   const disableDrawer = useMemo(
-    () => mainStorage.getBool('disableDrawer') || false,
-    [],
+    () => mainStorage.getBool('disableDrawer') || !adminHamburgerEnabled,
+    [adminHamburgerEnabled],
   );
 
   const provider = useContentStore(state => state.provider);
