@@ -20,6 +20,7 @@ import {useM3Colors} from '../theme/M3PaletteContext';
 import {isTV} from '../lib/tv/constants';
 import {TVFocusable, TVFocusGuide} from './tv';
 import {useTVFocusBorderColor} from '../lib/tv/useTVFocusBorderColor';
+import useAdminConfigStore from '../lib/zustand/adminConfigStore';
 
 import AppText from './ui/Text';
 import {beginUIInteraction, endUIInteraction} from '../lib/performance/idleWork';
@@ -115,7 +116,18 @@ const Slider = ({
     });
     pendingOffset.current = undefined;
   }, []);
-  const uniquePosts = useMemo(() => deduplicatePosts(posts), [posts]);
+  const adultContentEnabled = useAdminConfigStore(
+    state => state.config?.features?.adultContent === true,
+  );
+  const uniquePosts = useMemo(() => {
+    const unique = deduplicatePosts(posts);
+    if (adultContentEnabled) return unique;
+    // Hide clearly labelled mature titles/tags when the Admin Panel switch is off.
+    const matureLabel = /(?:\badult\b|18\s*\+|\bxxx\b|\bhentai\b|\becchi\b|\bporn(?:ographic)?\b)/i;
+    return unique.filter(post =>
+      !matureLabel.test([post.title, post.tag, post.cornerTag].filter(Boolean).join(' ')),
+    );
+  }, [posts, adultContentEnabled]);
   const {width: windowWidth} = useWindowDimensions();
   // Cards that fit on screen, plus one. The skeleton row clips overflow, so
   // more are never seen; the post row renders this many before measuring.
