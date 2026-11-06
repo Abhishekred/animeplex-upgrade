@@ -95,6 +95,8 @@ const downloadUpdate = async (url: string, name: string) => {
 };
 
 // handle check for update
+const UPDATE_RELEASES_URL = 'https://api.github.com/repos/Abhishekred/animeplex-upgrade/releases?per_page=20';
+
 export const checkForUpdate = async (
   setUpdateLoading: React.Dispatch<React.SetStateAction<boolean>>,
   autoDownload: boolean,
@@ -103,7 +105,7 @@ export const checkForUpdate = async (
   setUpdateLoading(true);
   try {
     const res = await fetch(
-      'https://api.github.com/repos/vega-org/vega-app/releases/latest',
+      UPDATE_RELEASES_URL,
     );
     if (res.status === 403 || res.status === 429) {
       ToastAndroid.show(
@@ -116,18 +118,29 @@ export const checkForUpdate = async (
     if (!res.ok) {
       throw new Error(`GitHub release check failed with status ${res.status}`);
     }
-    const data = await res.json();
-    if (!data?.tag_name) {
+    const releases = await res.json();
+    if (!Array.isArray(releases)) {
       throw new Error('Invalid release data received from GitHub');
     }
-    const localVersion = Application.nativeApplicationVersion;
-    const remoteVersion = Number(
-      data.tag_name.replace('v', '')?.split('.').join(''),
+    // Ignore CI draft/prerelease entries: Android users can only update from
+    // a release that has actually been published by the repository owner.
+    const data = releases.find(
+      (release: any) => !release?.draft && !release?.prerelease && release?.tag_name,
     );
-    if (compareVersions(localVersion || '', data.tag_name.replace('v', ''))) {
+    if (!data) {
+      ToastAndroid.show(
+        'No published AnimePlex release found yet. Please try again later.',
+        ToastAndroid.LONG,
+      );
+      return;
+    }
+    const localVersion = Application.nativeApplicationVersion || '0.0.0';
+    const latestVersion = String(data.tag_name).replace(/^[vV]/, '');
+    const remoteVersion = latestVersion;
+    if (compareVersions(localVersion, latestVersion)) {
       ToastAndroid.show('New update available', ToastAndroid.SHORT);
       showAppDialog({
-        title: `Update v${localVersion} -> ${data.tag_name}`,
+        title: `Update v${localVersion} -> v${latestVersion}`,
         message: data.body,
         messageFormat: 'markdown',
         actions: [
@@ -385,35 +398,16 @@ const About = ({navigation}: any) => {
 export default About;
 
 function compareVersions(localVersion: string, remoteVersion: string): boolean {
-  try {
-    // Split versions into arrays and convert to numbers
-    const local = localVersion.split('.').map(Number);
-    const remote = remoteVersion.split('.').map(Number);
-
-    // Compare major version
-    if (remote[0] > local[0]) {
-      return true;
-    }
-    if (remote[0] < local[0]) {
-      return false;
-    }
-
-    // Compare minor version
-    if (remote[1] > local[1]) {
-      return true;
-    }
-    if (remote[1] < local[1]) {
-      return false;
-    }
-
-    // Compare patch version
-    if (remote[2] > local[2]) {
-      return true;
-    }
-
-    return false;
-  } catch (error) {
-    console.error('Invalid version format');
-    return false;
+  const parse = (value: string) =>
+    value.replace(/^[vV]/, '').split(/[.+-]/).slice(0, 3).map(part => {
+      const match = part.match(/^\\d+/);
+      return match ? Number(match[0]) : 0;
+    });
+  const local = parse(localVersion);
+  const remote = parse(remoteVersion);
+  for (let index = 0; index < 3; index++) {
+    const difference = (remote[index] || 0) - (local[index] || 0);
+    if (difference !== 0) return difference > 0;
   }
+  return false;
 }
