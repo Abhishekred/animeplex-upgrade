@@ -331,6 +331,10 @@ const compareAppVersions = (left: string, right: string) => {
 
 const logScreenView = async () => {
   try {
+    // Respect both the user's local telemetry choice and the remote privacy switch.
+    if (useAdminConfigStore.getState().config?.privacy?.analyticsEnabled === false) {
+      return;
+    }
     const route = navigationRef.getCurrentRoute();
     if (route?.name) {
       const analytics = getAnalytics();
@@ -717,45 +721,51 @@ const App = () => {
     };
   }, []);
 
+  const adminPrivacy = useAdminConfigStore(state => state.config?.privacy);
+
   useEffect(() => {
-    const optIn = settingsStorage.isTelemetryOptIn();
+    const userOptIn = settingsStorage.isTelemetryOptIn();
+    const analyticsEnabled = userOptIn && adminPrivacy?.analyticsEnabled !== false;
+    const crashReportsEnabled = userOptIn && adminPrivacy?.crashReports !== false;
     if (hasFirebase) {
       try {
         const crashlytics = getCrashlytics();
-        crashlytics && crashlytics().setCrashlyticsCollectionEnabled(optIn);
+        crashlytics && crashlytics().setCrashlyticsCollectionEnabled(crashReportsEnabled);
       } catch {}
       try {
         const analytics = getAnalytics();
-        analytics && analytics().setAnalyticsCollectionEnabled(optIn);
+        analytics && analytics().setAnalyticsCollectionEnabled(analyticsEnabled);
       } catch {}
       try {
         const analytics = getAnalytics();
         analytics &&
           analytics().setConsent({
-            analytics_storage: optIn,
-            ad_storage: optIn,
-            ad_user_data: optIn,
-            ad_personalization: optIn,
+            analytics_storage: analyticsEnabled,
+            ad_storage: analyticsEnabled,
+            ad_user_data: analyticsEnabled,
+            ad_personalization: analyticsEnabled,
           });
       } catch {}
 
-      // Mark app open
-      try {
-        const analytics = getAnalytics();
-        analytics && analytics().logAppOpen();
-      } catch {}
-      // Example user property: theme
-      try {
-        const analytics = getAnalytics();
-        analytics &&
-          analytics().setUserProperty('theme_preference', 'fixed-neutral');
-      } catch {}
+      // Never emit analytics events while either privacy control disables collection.
+      if (analyticsEnabled) {
+        try {
+          const analytics = getAnalytics();
+          analytics && analytics().logAppOpen();
+        } catch {}
+        try {
+          const analytics = getAnalytics();
+          analytics &&
+            analytics().setUserProperty('theme_preference', 'fixed-neutral');
+        } catch {}
+      }
 
-      // Initial Crashlytics log
-      try {
-        const crashlytics = getCrashlytics();
-        crashlytics && crashlytics().log('App mounted');
-      } catch {}
+      if (crashReportsEnabled) {
+        try {
+          const crashlytics = getCrashlytics();
+          crashlytics && crashlytics().log('App mounted');
+        } catch {}
+      }
     }
 
     const unsubscribe = notifee.onForegroundEvent(({type, detail}) => {
@@ -782,7 +792,7 @@ const App = () => {
     return () => {
       unsubscribe();
     };
-  }, [hasFirebase]);
+  }, [hasFirebase, adminPrivacy?.analyticsEnabled, adminPrivacy?.crashReports]);
 
   // Initialize update service
   useEffect(() => {
