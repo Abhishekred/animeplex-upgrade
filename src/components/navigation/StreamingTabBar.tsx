@@ -14,6 +14,7 @@ import {useM3Colors} from '../../theme/M3PaletteContext';
 import AppText from '../ui/Text';
 import {AnimatedTabIcon, type AnimatedTabIconName} from './AnimatedTabIcon';
 import {isTV} from '../../lib/tv/constants';
+import useAdminConfigStore from '../../lib/zustand/adminConfigStore';
 import {useTVFocusBorderColor} from '../../lib/tv/useTVFocusBorderColor';
 
 const TAB_ICONS: Record<string, AnimatedTabIconName> = {
@@ -216,6 +217,22 @@ const StreamingTabBar = ({
   navigation,
 }: BottomTabBarProps) => {
   const colors = useM3Colors();
+  const adminNavigation = useAdminConfigStore(state => state.config?.navigationBar);
+  const adminPlatform = useAdminConfigStore(state => state.config?.platformStyle);
+  const adminNavigationEnabled = adminNavigation?.enabled !== false;
+  const tabBackground = adminNavigationEnabled && typeof adminNavigation?.backgroundColor === 'string'
+    ? adminNavigation.backgroundColor : colors.surfaceContainerHigh;
+  const activePill = adminNavigationEnabled && typeof adminNavigation?.activePillColor === 'string'
+    ? adminNavigation.activePillColor : colors.secondaryContainer;
+  const activeIcon = adminNavigationEnabled && typeof adminNavigation?.activeIconColor === 'string'
+    ? adminNavigation.activeIconColor : colors.onSecondaryContainer;
+  const inactiveIcon = adminNavigationEnabled && typeof adminNavigation?.inactiveIconColor === 'string'
+    ? adminNavigation.inactiveIconColor : colors.onSurfaceVariant;
+  const tabText = adminNavigationEnabled && typeof adminNavigation?.textColor === 'string'
+    ? adminNavigation.textColor : colors.onSurface;
+  const inactiveText = adminNavigationEnabled && typeof adminNavigation?.inactiveTextColor === 'string'
+    ? adminNavigation.inactiveTextColor : colors.onSurfaceVariant;
+
   const insets = useSafeAreaInsets();
   const {width: windowWidth, height: windowHeight} = useWindowDimensions();
   const isNavigationRail = isTV || Math.min(windowWidth, windowHeight) >= 600;
@@ -230,7 +247,7 @@ const StreamingTabBar = ({
   return (
     <View
       style={{
-        backgroundColor: colors.surfaceContainerHigh,
+        backgroundColor: tabBackground,
         borderRightColor: isNavigationRail ? colors.outlineVariant : undefined,
         borderRightWidth: isNavigationRail ? StyleSheet.hairlineWidth : 0,
         height: isNavigationRail ? '100%' : undefined,
@@ -289,7 +306,7 @@ const StreamingTabBar = ({
               accessibilityLabel={descriptor.options.tabBarAccessibilityLabel}
               isNavigationRail={isNavigationRail}
               showLabels={showLabels}
-              colors={colors}
+              colors={{...colors, secondaryContainer: activePill, onSecondaryContainer: activeIcon, onSurfaceVariant: inactiveIcon, onSurface: tabText}}
               onPress={onPress}
               onLongPress={() =>
                 navigation.emit({type: 'tabLongPress', target: route.key})
