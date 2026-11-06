@@ -17,8 +17,10 @@ export type AnimePlexAdminConfig = {
   };
 };
 
+// Read the public config file directly from GitHub. The Vercel dashboard is
+// protected by team SSO; app clients must not need dashboard authentication.
 const ADMIN_CONFIG_URL =
-  'https://animeplex-admin-panel.vercel.app/api/config';
+  'https://raw.githubusercontent.com/Abhishekred/Animeplex-Admin-panel/main/admin-config.json';
 
 let cachedConfig: AnimePlexAdminConfig | null = null;
 let lastFetchAt = 0;
@@ -44,19 +46,15 @@ export async function fetchAnimePlexAdminConfig(
       throw new Error(`Admin config request failed: HTTP ${response.status}`);
     }
 
-    const payload = (await response.json()) as {
-      app?: string;
-      config?: AnimePlexAdminConfig;
-      updatedAt?: string | null;
-    };
-    if (!payload.config || typeof payload.config !== 'object') {
+    const payload = (await response.json()) as AnimePlexAdminConfig;
+    if (!payload || typeof payload !== 'object') {
       throw new Error('Admin config response is invalid');
     }
 
     cachedConfig = {
-      ...payload.config,
-      app: payload.app || payload.config.app || 'AnimePlex',
-      updatedAt: payload.updatedAt || payload.config.updatedAt || null,
+      ...payload,
+      app: payload.app || 'AnimePlex',
+      updatedAt: payload.updatedAt || null,
     };
     lastFetchAt = Date.now();
     return cachedConfig;
