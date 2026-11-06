@@ -218,7 +218,6 @@ const StreamingTabBar = ({
 }: BottomTabBarProps) => {
   const colors = useM3Colors();
   const adminNavigation = useAdminConfigStore(state => state.config?.navigationBar);
-  const adminPlatform = useAdminConfigStore(state => state.config?.platformStyle);
   const adminNavigationEnabled = adminNavigation?.enabled !== false;
   const tabBackground = adminNavigationEnabled && typeof adminNavigation?.backgroundColor === 'string'
     ? adminNavigation.backgroundColor : colors.surfaceContainerHigh;
@@ -230,8 +229,6 @@ const StreamingTabBar = ({
     ? adminNavigation.inactiveIconColor : colors.onSurfaceVariant;
   const tabText = adminNavigationEnabled && typeof adminNavigation?.textColor === 'string'
     ? adminNavigation.textColor : colors.onSurface;
-  const inactiveText = adminNavigationEnabled && typeof adminNavigation?.inactiveTextColor === 'string'
-    ? adminNavigation.inactiveTextColor : colors.onSurfaceVariant;
 
   const insets = useSafeAreaInsets();
   const {width: windowWidth, height: windowHeight} = useWindowDimensions();
