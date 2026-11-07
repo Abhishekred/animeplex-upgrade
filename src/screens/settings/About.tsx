@@ -1,5 +1,5 @@
 import {useFocusEffect} from '@react-navigation/native';
-import {View, ScrollView, ToastAndroid, Linking, BackHandler, findNodeHandle} from 'react-native';
+import {View, ScrollView, ToastAndroid, Linking, BackHandler, findNodeHandle, Image} from 'react-native';
 // import pkg from '../../../package.json';
 import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {settingsStorage} from '../../lib/storage';
@@ -302,10 +302,23 @@ const About = ({navigation}: any) => {
                 color={colors.onBackground}
               />
             </TVFocusable>
+            <Image
+              source={require('../../../assets/adaptive_icon.png')}
+              resizeMode="contain"
+              accessible
+              accessibilityLabel="AnimePlex app logo"
+              style={{
+                width: 56,
+                height: 56,
+                marginRight: 12,
+                borderRadius: 12,
+                backgroundColor: colors.surfaceContainerHigh,
+              }}
+            />
             <AppText
               role="headlineLargeEmphasized"
               className="text-m3-on-background">
-              About Vega
+              AnimePlex
             </AppText>
           </View>
           <AppText role="bodyLarge" className="mt-1 text-m3-on-surface-variant">
@@ -316,7 +329,7 @@ const About = ({navigation}: any) => {
         <SettingsSection title="App">
           <SettingsRow
             title="Version"
-            description={`Vega ${Application.nativeApplicationVersion || ''}`}
+            description={`AnimePlex ${Application.nativeApplicationVersion || ''}`}
             icon="information-outline"
             divider={Constants.expoConfig?.extra?.isPlayStore}
           />
@@ -336,7 +349,7 @@ const About = ({navigation}: any) => {
               />
               <SettingsSwitchRow
                 title="Check on startup"
-                description="Look for a new release when Vega opens"
+                description="Look for a new release when AnimePlex opens"
                 value={autoCheckUpdate}
                 onValueChange={next => {
                   setAutoCheckUpdate(next);
@@ -345,7 +358,7 @@ const About = ({navigation}: any) => {
               />
               <SettingsRow
                 title="Check for updates"
-                description="Compare this build with the latest release"
+                description="Compare this AnimePlex build with the latest release"
                 icon="update"
                 divider={false}
                 trailing={
