@@ -159,6 +159,7 @@ module.exports = () => {
         enabled: true,
         checkAutomatically: 'ON_LOAD',
         fallbackToCacheTimeout: 0,
+        requestHeaders: {'expo-channel-name': 'animeplex-manual'},
       },
       userInterfaceStyle: 'dark',
       experiments: {
