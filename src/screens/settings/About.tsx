@@ -94,8 +94,20 @@ const downloadUpdate = async (url: string, name: string) => {
   }
 };
 
-// handle check for update
-const UPDATE_RELEASES_URL = 'https://api.github.com/repos/Abhishekred/animeplex-upgrade/releases?per_page=20';
+// AnimePlex releases are managed from the Admin Panel. The panel API reads
+// the public release manifest and keeps GitHub credentials off the Android app.
+const UPDATE_MANIFEST_URL = 'https://aimeplex2admin.vercel.app/api/release';
+
+type AnimePlexReleaseManifest = {
+  app?: string;
+  version: string;
+  versionCode?: number;
+  forceUpdate?: boolean;
+  title?: string;
+  releaseNotes?: string;
+  apkUrl?: string;
+  minimumVersion?: string;
+};
 
 export const checkForUpdate = async (
   setUpdateLoading: React.Dispatch<React.SetStateAction<boolean>>,
@@ -104,100 +116,82 @@ export const checkForUpdate = async (
 ) => {
   setUpdateLoading(true);
   try {
-    const res = await fetch(
-      UPDATE_RELEASES_URL,
-    );
-    if (res.status === 403 || res.status === 429) {
-      ToastAndroid.show(
-        'GitHub API rate limit exceeded. Please wait a few minutes before trying again.',
-        ToastAndroid.LONG,
-      );
-      setUpdateLoading(false);
-      return;
-    }
+    const res = await fetch(UPDATE_MANIFEST_URL, {
+      method: 'GET',
+      headers: {Accept: 'application/json', 'Cache-Control': 'no-cache'},
+    });
     if (!res.ok) {
-      throw new Error(`GitHub release check failed with status ${res.status}`);
+      throw new Error(`Admin Panel update check failed (HTTP ${res.status})`);
     }
-    const releases = await res.json();
-    if (!Array.isArray(releases)) {
-      throw new Error('Invalid release data received from GitHub');
+
+    const data = (await res.json()) as AnimePlexReleaseManifest;
+    if (
+      data?.app !== 'AnimePlex' ||
+      typeof data.version !== 'string' ||
+      !/^\\d+\\.\\d+\\.\\d+$/.test(data.version)
+    ) {
+      throw new Error('Admin Panel returned an invalid AnimePlex release manifest');
     }
-    // Ignore CI draft/prerelease entries: Android users can only update from
-    // a release that has actually been published by the repository owner.
-    const data = releases.find(
-      (release: any) => !release?.draft && !release?.prerelease && release?.tag_name,
-    );
-    if (!data) {
-      ToastAndroid.show(
-        'No published AnimePlex release found yet. Please try again later.',
-        ToastAndroid.LONG,
-      );
-      setUpdateLoading(false);
+
+    const localVersion = Application.nativeApplicationVersion || '0.0.0';
+    const latestVersion = data.version;
+    const hasUpdate = compareVersions(localVersion, latestVersion);
+    const isBelowMinimum =
+      !!data.minimumVersion &&
+      compareVersions(localVersion, data.minimumVersion);
+
+    if (!hasUpdate && !isBelowMinimum) {
+      showToast && ToastAndroid.show('AnimePlex is up to date', ToastAndroid.SHORT);
       return;
     }
-    const localVersion = Application.nativeApplicationVersion || '0.0.0';
-    const latestVersion = String(data.tag_name).replace(/^[vV]/, '');
-    const remoteVersion = latestVersion;
-    if (compareVersions(localVersion, latestVersion)) {
-      ToastAndroid.show('New update available', ToastAndroid.SHORT);
-      showAppDialog({
-        title: `Update v${localVersion} -> v${latestVersion}`,
-        message: data.body,
-        messageFormat: 'markdown',
-        actions: [
-          {label: 'Cancel'},
-          {
-            label: 'Update',
-            variant: 'primary',
-            onPress: () => {
-              const targetKeyword = isTV ? 'tv' : 'mobile';
-              const apkAsset =
-                data?.assets?.find(
-                  (asset: any) =>
-                    asset.name?.endsWith('.apk') &&
-                    asset.name?.toLowerCase().includes(targetKeyword),
-                ) ||
-                data?.assets?.find(
-                  (asset: any) =>
-                    asset.name?.endsWith('.apk') &&
-                    asset.name?.toLowerCase().includes('universal'),
-                ) ||
-                data?.assets?.find((asset: any) =>
-                  asset.name?.endsWith('.apk'),
-                );
-              return autoDownload && apkAsset
-                ? downloadUpdate(apkAsset.browser_download_url, apkAsset.name)
-                : Linking.openURL(data.html_url);
-            },
-          },
-        ],
-      });
-      console.log(
-        'local version',
-        localVersion,
-        'remote version',
-        remoteVersion,
-      );
-    } else {
-      showToast && ToastAndroid.show('App is up to date', ToastAndroid.SHORT);
-      console.log(
-        'local version',
-        localVersion,
-        'remote version',
-        remoteVersion,
+
+    const apkUrl =
+      typeof data.apkUrl === 'string' && /^https:\\/\\//i.test(data.apkUrl)
+        ? data.apkUrl
+        : '';
+    const apkLinkConfigured =
+      !!apkUrl && !apkUrl.includes('aimeplex2admin.vercel.app');
+
+    if (!apkLinkConfigured) {
+      ToastAndroid.show(
+        'Update is listed in Admin Panel, but a direct APK URL has not been configured yet.',
+        ToastAndroid.LONG,
       );
     }
+
+    showAppDialog({
+      title: data.title || `AnimePlex update v${latestVersion}`,
+      message:
+        data.releaseNotes ||
+        `A new AnimePlex version (${latestVersion}) is available.`,
+      messageFormat: 'markdown',
+      actions: [
+        ...(data.forceUpdate || isBelowMinimum ? [] : [{label: 'Later'}]),
+        {
+          label: apkLinkConfigured ? 'Update' : 'Close',
+          variant: 'primary',
+          onPress: () => {
+            if (!apkLinkConfigured) return;
+            const fileName = `AnimePlex-${latestVersion}-${isTV ? 'TV' : 'Mobile'}.apk`;
+            return autoDownload
+              ? downloadUpdate(apkUrl, fileName)
+              : Linking.openURL(apkUrl);
+          },
+        },
+      ],
+    });
+    console.log('AnimePlex update manifest', {
+      localVersion,
+      latestVersion,
+      versionCode: data.versionCode,
+      forceUpdate: data.forceUpdate,
+    });
   } catch (error) {
-    const isRateLimit =
-      error instanceof Error &&
-      error.message.toLowerCase().includes('rate limit');
-    const msg = isRateLimit
-      ? 'GitHub API rate limit exceeded. Please wait a few minutes before trying again.'
-      : 'Failed to check for update';
-    ToastAndroid.show(msg, ToastAndroid.SHORT);
-    console.log('Update error', error);
+    ToastAndroid.show('Could not check AnimePlex updates. Please try again.', ToastAndroid.SHORT);
+    console.log('Admin Panel update error', error);
+  } finally {
+    setUpdateLoading(false);
   }
-  setUpdateLoading(false);
 };
 
 const About = ({navigation}: any) => {
