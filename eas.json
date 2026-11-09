@@ -22,7 +22,8 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
-      }
+      },
+      "channel": "animeplex-manual"
     },
     "preview_tv": {
       "env": {
@@ -33,7 +34,8 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
-      }
+      },
+      "channel": "animeplex-manual"
     },
     "production": {
       "env": {
