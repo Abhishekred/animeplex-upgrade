@@ -1,0 +1,53 @@
+name: AnimePlex Manual OTA Publish
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: animeplex-manual-ota
+  cancel-in-progress: false
+
+jobs:
+  publish-ota:
+    name: Publish Android OTA update
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      APP_VARIANT: standalone
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Validate Expo token
+        shell: bash
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Missing EXPO_TOKEN repository secret. Add an Expo access token in GitHub Actions secrets."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build sandbox runtime
+        run: npm run build:sandbox
+
+      - name: Publish OTA update
+        run: >
+          npx eas-cli update
+          --branch animeplex-manual
+          --platform android
+          --message "AnimePlex manual OTA ${{ github.sha }}"
+          --non-interactive
